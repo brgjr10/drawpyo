@@ -26,7 +26,7 @@ export const Canvas = () => {
   const [isPanning, setIsPanning] = useState(false)
   const [selectionRect, setSelectionRect] = useState<{ x: number; y: number; width: number; height: number } | null>(null)
   const [connectingFrom, setConnectingFrom] = useState<string | null>(null)
-  const [mousePos, setMousePos] = useState<Point>({ x: 0, y: 0 })
+  const [mousePos, setMousePos] = useState<Point & { shiftKey?: boolean }>({ x: 0, y: 0 })
 
   const imageCache = useRef<Map<string, HTMLImageElement>>(new Map())
 
@@ -89,8 +89,10 @@ export const Canvas = () => {
     if (activeTool === 'select') {
       const clickedOnEmpty = e.target === e.target.getStage() || e.target.getParent()?.className === 'Stage'
       if (clickedOnEmpty) {
-        setSelectedBlockIds([])
-        setSelectedConnectionId(null)
+        if (!e.evt.shiftKey) {
+          setSelectedBlockIds([])
+          setSelectedConnectionId(null)
+        }
         const pos = getRelativePointerPosition()
         setSelectionRect({ x: pos.x, y: pos.y, width: 0, height: 0 })
       }
@@ -99,7 +101,7 @@ export const Canvas = () => {
 
   const handleStageMouseMove = (e: Konva.KonvaEventObject<MouseEvent>) => {
     const pos = getRelativePointerPosition()
-    setMousePos(pos)
+    setMousePos({ x: pos.x, y: pos.y, shiftKey: e.evt.shiftKey })
 
     if (isPanning) {
       const stage = stageRef.current
@@ -129,7 +131,7 @@ export const Canvas = () => {
 
     if (selectionRect && project) {
       const { x, y, width, height } = selectionRect
-      const selected = project.blocks.filter((b) => {
+      const newSelected = project.blocks.filter((b) => {
         return (
           b.x + b.width > x &&
           b.x < x + width &&
@@ -137,9 +139,21 @@ export const Canvas = () => {
           b.y < y + height
         )
       })
-      setSelectedBlockIds(selected.map((b) => b.id))
+      const newSelectedIds = newSelected.map((b) => b.id)
+      setSelectedBlockIds((prev) => {
+        const combined = new Set(prev)
+        newSelectedIds.forEach((id) => combined.add(id))
+        return Array.from(combined)
+      })
       setSelectionRect(null)
     }
+  }
+
+  const handleBlockDragMove = (block: Block, e: Konva.KonvaEventObject<DragEvent>) => {
+    updateBlock(block.id, {
+      x: e.target.x(),
+      y: e.target.y(),
+    })
   }
 
   const handleBlockDragEnd = (block: Block, e: Konva.KonvaEventObject<DragEvent>) => {
@@ -149,7 +163,19 @@ export const Canvas = () => {
     })
   }
 
-  const handleBlockClick = (blockId: string) => {
+  const handleWaypointDragEnd = (connectionId: string, index: number, e: Konva.KonvaEventObject<DragEvent>) => {
+    handleWaypointDragMove(connectionId, index, e)
+  }
+
+  const handleWaypointDragMove = (connectionId: string, index: number, e: Konva.KonvaEventObject<DragEvent>) => {
+    const conn = project?.connections.find((c) => c.id === connectionId)
+    if (!conn || conn.routing !== 'user-guided') return
+    const newWaypoints = [...conn.waypoints]
+    newWaypoints[index] = { x: e.target.x(), y: e.target.y() }
+    updateConnection(connectionId, { waypoints: newWaypoints })
+  }
+
+  const handleBlockClick = (blockId: string, e: Konva.KonvaEventObject<MouseEvent> | Konva.KonvaEventObject<TouchEvent>) => {
     if (activeTool === 'connect') {
       if (!connectingFrom) {
         setConnectingFrom(blockId)
@@ -169,13 +195,24 @@ export const Canvas = () => {
       }
       return
     }
-    setSelectedBlockIds([blockId])
+
+    if (e.evt.shiftKey) {
+      setSelectedBlockIds((prev) =>
+        prev.includes(blockId) ? prev.filter((id) => id !== blockId) : [...prev, blockId]
+      )
+    } else {
+      setSelectedBlockIds([blockId])
+    }
     setSelectedConnectionId(null)
   }
 
-  const handleConnectionClick = (connectionId: string) => {
-    setSelectedConnectionId(connectionId)
-    setSelectedBlockIds([])
+  const handleConnectionClick = (connectionId: string, e: Konva.KonvaEventObject<MouseEvent> | Konva.KonvaEventObject<TouchEvent>) => {
+    if (e.evt.shiftKey) {
+      setSelectedConnectionId((prev) => prev === connectionId ? null : connectionId)
+    } else {
+      setSelectedConnectionId(connectionId)
+      setSelectedBlockIds([])
+    }
   }
 
   const handleCanvasDoubleClick = () => {
@@ -262,20 +299,52 @@ export const Canvas = () => {
 
             const isSelected = selectedConnectionId === conn.id
 
+            const lastIdx = points.length - 2
+            const arrowAngle = Math.atan2(points[lastIdx + 1] - points[lastIdx - 1], points[lastIdx] - points[lastIdx - 2])
+            const arrowSize = 10
+            const ax1 = points[lastIdx] - arrowSize * Math.cos(arrowAngle - Math.PI / 6)
+            const ay1 = points[lastIdx + 1] - arrowSize * Math.sin(arrowAngle - Math.PI / 6)
+            const ax2 = points[lastIdx] - arrowSize * Math.cos(arrowAngle + Math.PI / 6)
+            const ay2 = points[lastIdx + 1] - arrowSize * Math.sin(arrowAngle + Math.PI / 6)
+
             return (
-              <Line
-                key={conn.id}
-                points={points}
-                stroke={isSelected ? theme.theme.primary : theme.theme.textSecondary}
-                strokeWidth={isSelected ? 3 : 2}
-                fill={theme.theme.background}
-                lineCap="round"
-                lineJoin="round"
-                onClick={() => handleConnectionClick(conn.id)}
-                onTap={() => handleConnectionClick(conn.id)}
-              />
-            )
-          })}
+              <Group key={conn.id}>
+                <Line
+                  points={points}
+                  stroke={isSelected ? theme.theme.primary : theme.theme.textSecondary}
+                  strokeWidth={isSelected ? 3 : 2}
+                  fill={theme.theme.background}
+                  lineCap="round"
+                  lineJoin="round"
+                onClick={(e) => handleConnectionClick(conn.id, e)}
+                onTap={(e) => handleConnectionClick(conn.id, e)}
+                />
+                 <Line
+                   points={[points[lastIdx], points[lastIdx + 1], ax1, ay1, ax2, ay2]}
+                   closed
+                   fill={isSelected ? theme.theme.primary : theme.theme.textSecondary}
+                   stroke={isSelected ? theme.theme.primary : theme.theme.textSecondary}
+                   strokeWidth={1}
+                   listening={false}
+                 />
+                 {isSelected && conn.routing === 'user-guided' && conn.waypoints.map((wp, idx) => (
+                   <Rect
+                     key={idx}
+                     x={wp.x - 5}
+                     y={wp.y - 5}
+                     width={10}
+                     height={10}
+                     fill={theme.theme.card}
+                     stroke={theme.theme.primary}
+                     strokeWidth={2}
+                     draggable
+                     onDragMove={(e) => handleWaypointDragMove(conn.id, idx, e)}
+                     onDragEnd={(e) => handleWaypointDragEnd(conn.id, idx, e)}
+                   />
+                 ))}
+               </Group>
+             )
+           })}
 
           {connectingFrom && (() => {
             const fromBlock = project.blocks.find((b) => b.id === connectingFrom)
@@ -301,8 +370,9 @@ export const Canvas = () => {
                 x={block.x}
                 y={block.y}
                 draggable={activeTool === 'select'}
-                onClick={() => handleBlockClick(block.id)}
-                onTap={() => handleBlockClick(block.id)}
+                onClick={(e) => handleBlockClick(block.id, e)}
+                onTap={(e) => handleBlockClick(block.id, e)}
+                onDragMove={(e) => handleBlockDragMove(block, e)}
                 onDragEnd={(e) => handleBlockDragEnd(block, e)}
               >
                 <Rect

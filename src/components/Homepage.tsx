@@ -105,6 +105,9 @@ export const Homepage = () => {
               </button>
             </div>
           ))}
+          <button className="btn" onClick={handleOpen} style={{ width: '100%', marginTop: 8, padding: '8px 12px', fontSize: 13 }}>
+            View All Projects
+          </button>
         </div>
       )}
 

@@ -102,3 +102,52 @@ class DrawpyoClient:
         return requests.delete(
             f"{self.base_url}/projects/{project_id}/connections/{connection_id}"
         ).json()
+
+    def update_connection(
+        self,
+        project_id: str,
+        connection_id: str,
+        from_block_id: Optional[str] = None,
+        to_block_id: Optional[str] = None,
+        from_port: Optional[str] = None,
+        to_port: Optional[str] = None,
+        routing: Optional[str] = None,
+        waypoints: Optional[List[Dict[str, float]]] = None,
+    ) -> Dict[str, Any]:
+        payload = {k: v for k, v in {
+            "fromBlockId": from_block_id,
+            "toBlockId": to_block_id,
+            "fromPort": from_port,
+            "toPort": to_port,
+            "routing": routing,
+            "waypoints": waypoints,
+        }.items() if v is not None}
+        return requests.put(
+            f"{self.base_url}/projects/{project_id}/connections/{connection_id}",
+            json=payload,
+        ).json()
+
+    def export_image(self, project_id: str, transparent: bool = False) -> bytes:
+        resp = requests.post(
+            f"{self.base_url}/projects/{project_id}/export",
+            json={"transparent": transparent},
+        )
+        resp.raise_for_status()
+        return resp.content
+
+    def set_theme(self, project_id: str, theme_name: str) -> Dict[str, Any]:
+        return requests.post(
+            f"{self.base_url}/projects/{project_id}/theme",
+            json={"theme": theme_name},
+        ).json()
+
+    def set_viewport(self, project_id: str, x: float, y: float, scale: float) -> Dict[str, Any]:
+        return requests.post(
+            f"{self.base_url}/projects/{project_id}/viewport",
+            json={"x": x, "y": y, "scale": scale},
+        ).json()
+
+    def delete_project(self, project_id: str) -> Dict[str, Any]:
+        return requests.delete(
+            f"{self.base_url}/projects/{project_id}"
+        ).json()

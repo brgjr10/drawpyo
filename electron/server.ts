@@ -51,6 +51,10 @@ function methodNotAllowed(res: http.ServerResponse) {
   json(res, 405, { error: 'Method not allowed' })
 }
 
+addRoute('GET', '/health', (_req, res) => {
+  json(res, 200, { status: 'ok' })
+})
+
 addRoute('GET', '/projects', (_req, res) => {
   const { project } = useAppStore.getState()
   if (!project) {
@@ -154,6 +158,72 @@ addRoute('DELETE', '/projects/:id/connections/:connectionId', (req, res) => {
     return
   }
   deleteConnection(connectionId)
+  json(res, 200, { success: true })
+})
+
+addRoute('PUT', '/projects/:id/connections/:connectionId', (req, res, body) => {
+  const { id, connectionId } = (req as any).params as { id: string; connectionId: string }
+  const { project, updateConnection } = useAppStore.getState()
+  if (!project || project.id !== id) {
+    json(res, 404, { error: 'Project not found' })
+    return
+  }
+  updateConnection(connectionId, body)
+  json(res, 200, { success: true })
+})
+
+addRoute('POST', '/projects/:id/export', (req, res, body) => {
+  const { id } = (req as any).params as { id: string }
+  const { project } = useAppStore.getState()
+  if (!project || project.id !== id) {
+    json(res, 404, { error: 'Project not found' })
+    return
+  }
+  const { exportCanvas } = require('../src/utils/export')
+  exportCanvas(body?.transparent || false).then((blob) => {
+    if (!blob) {
+      json(res, 500, { error: 'Export failed' })
+      return
+    }
+    res.writeHead(200, { 'Content-Type': 'image/png' })
+    blob.arrayBuffer().then((buf) => res.end(Buffer.from(buf)))
+  }).catch(() => json(res, 500, { error: 'Export failed' }))
+})
+
+addRoute('POST', '/projects/:id/theme', (req, res, body) => {
+  const { id } = (req as any).params as { id: string }
+  const { project, setTheme } = useAppStore.getState()
+  if (!project || project.id !== id) {
+    json(res, 404, { error: 'Project not found' })
+    return
+  }
+  if (body?.theme) {
+    setTheme(body.theme)
+  }
+  json(res, 200, { success: true, theme: useAppStore.getState().currentTheme })
+})
+
+addRoute('POST', '/projects/:id/viewport', (req, res, body) => {
+  const { id } = (req as any).params as { id: string }
+  const { project, setViewport } = useAppStore.getState()
+  if (!project || project.id !== id) {
+    json(res, 404, { error: 'Project not found' })
+    return
+  }
+  if (body?.x !== undefined && body?.y !== undefined && body?.scale !== undefined) {
+    setViewport({ x: body.x, y: body.y, scale: body.scale })
+  }
+  json(res, 200, { success: true, viewport: project.viewport })
+})
+
+addRoute('DELETE', '/projects/:id', (req, res) => {
+  const { id } = (req as any).params as { id: string }
+  const { project, clearProject } = useAppStore.getState()
+  if (!project || project.id !== id) {
+    json(res, 404, { error: 'Project not found' })
+    return
+  }
+  clearProject()
   json(res, 200, { success: true })
 })
 

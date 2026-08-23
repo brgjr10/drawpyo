@@ -2,7 +2,11 @@
   "name": "@brgjr10/drawpyo",
   "version": "0.1.0",
   "publishConfig": {
-    "registry": "https://github.com"
+    "registry": "https://npm.pkg.github.com"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/brgjr10/drawpyo.git"
   },
   "description": "Visual project planning and diagramming tool",
   "main": "dist-electron/main.js",
