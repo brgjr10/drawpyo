@@ -1,0 +1,14 @@
+node_modules/
+dist/
+dist-electron/
+*.asar
+*.asar.unpack/
+
+instructions.md
+
+.env
+.env.local
+*.log
+
+.DS_Store
+Thumbs.db
