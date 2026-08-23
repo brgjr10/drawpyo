@@ -9,10 +9,8 @@ export const Sidebar = () => {
 
   if (sidebarCollapsed) {
     return (
-      <div className="sidebar collapsed" style={{ borderLeftColor: theme.theme.cardBorder, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-        <button className="btn" onClick={toggleSidebar} style={{ padding: 4, width: 24, height: 24, fontSize: 16, lineHeight: 1 }}>
-          &lt;
-        </button>
+      <div className="sidebar collapsed" style={{ borderLeftColor: theme.theme.cardBorder, display: 'flex', alignItems: 'center', justifyContent: 'center', background: theme.theme.card }}>
+        <button className="btn" onClick={toggleSidebar} style={{ padding: 4, width: 24, height: 24, fontSize: 16, lineHeight: 1, background: theme.theme.card, borderColor: theme.theme.cardBorder, color: theme.theme.textPrimary }}>&gt;</button>
       </div>
     )
   }
@@ -27,11 +25,9 @@ export const Sidebar = () => {
 
   return (
     <div className="sidebar" style={{ background: theme.theme.card, borderLeftColor: theme.theme.cardBorder }}>
-      <div className="sidebar-header" style={{ color: theme.theme.textSecondary, borderBottomColor: theme.theme.cardBorder }}>
+      <div className="sidebar-header" style={{ color: theme.theme.textPrimary, opacity: 0.8, borderBottomColor: theme.theme.cardBorder }}>
         Editor
-        <button className="btn" onClick={toggleSidebar} style={{ marginLeft: 'auto', padding: 2, width: 24, height: 24, fontSize: 12 }}>
-          &lt;
-        </button>
+        <button className="btn" onClick={toggleSidebar} style={{ marginLeft: 'auto', padding: 2, width: 24, height: 24, fontSize: 12, background: theme.theme.card, borderColor: theme.theme.cardBorder, color: theme.theme.textPrimary }}>&gt;</button>
       </div>
       <div className="sidebar-body">
         {selectedBlock ? (
@@ -49,7 +45,7 @@ export const Sidebar = () => {
             onDelete={() => deleteConnection(selectedConnection.id)}
           />
         ) : (
-          <div className="empty-state" style={{ color: theme.theme.textSecondary }}>
+          <div className="empty-state" style={{ color: theme.theme.textPrimary, opacity: 0.6 }}>
             Select a block or connection to edit its properties.
           </div>
         )}
@@ -105,7 +101,7 @@ const BlockEditor = ({
     <div className="sidebar-section">
       <div className="sidebar-label">Block</div>
       <div className="sidebar-row">
-        <label style={{ fontSize: 12, color: theme.textSecondary }}>Title</label>
+        <label style={{ fontSize: 12, color: theme.textPrimary, opacity: 0.7 }}>Title</label>
         <input
           className="input"
           value={block.title}
@@ -114,7 +110,7 @@ const BlockEditor = ({
         />
       </div>
       <div className="sidebar-row" style={{ marginTop: 12 }}>
-        <label style={{ fontSize: 12, color: theme.textSecondary }}>Description</label>
+        <label style={{ fontSize: 12, color: theme.textPrimary, opacity: 0.7 }}>Description</label>
         <textarea
           className="textarea"
           value={block.description}
@@ -123,7 +119,16 @@ const BlockEditor = ({
         />
       </div>
       <div className="sidebar-row" style={{ marginTop: 12 }}>
-        <label style={{ fontSize: 12, color: theme.textSecondary }}>Image</label>
+        <label style={{ fontSize: 12, color: theme.textPrimary, opacity: 0.7 }}>Size</label>
+        <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+          <button className="btn" onClick={() => onUpdate({ width: Math.max(80, block.width - 20) })} style={{ padding: '2px 8px', fontSize: 12, background: theme.card, borderColor: theme.cardBorder, color: theme.textPrimary }}>W-</button>
+          <button className="btn" onClick={() => onUpdate({ width: block.width + 20 })} style={{ padding: '2px 8px', fontSize: 12, background: theme.card, borderColor: theme.cardBorder, color: theme.textPrimary }}>W+</button>
+          <button className="btn" onClick={() => onUpdate({ height: Math.max(40, block.height - 20) })} style={{ padding: '2px 8px', fontSize: 12, background: theme.card, borderColor: theme.cardBorder, color: theme.textPrimary }}>H-</button>
+          <button className="btn" onClick={() => onUpdate({ height: block.height + 20 })} style={{ padding: '2px 8px', fontSize: 12, background: theme.card, borderColor: theme.cardBorder, color: theme.textPrimary }}>H+</button>
+        </div>
+      </div>
+      <div className="sidebar-row" style={{ marginTop: 12 }}>
+        <label style={{ fontSize: 12, color: theme.textPrimary, opacity: 0.7 }}>Image</label>
         <div
           onDragOver={handleDragOver}
           onDragLeave={handleDragLeave}
@@ -162,7 +167,7 @@ const BlockEditor = ({
                 </button>
                 <button
                   className="btn btn-danger"
-                  style={{ padding: '2px 8px', fontSize: 11 }}
+                  style={{ padding: '2px 8px', fontSize: 11, background: theme.danger, borderColor: theme.danger, color: '#fff' }}
                   onMouseDown={(e) => e.stopPropagation()}
                   onClick={(e) => { e.stopPropagation(); onUpdate({ image: null }) }}
                 >
@@ -171,18 +176,16 @@ const BlockEditor = ({
               </div>
             </>
           ) : (
-            <div style={{ color: theme.textSecondary, fontSize: 12 }}>
+            <div style={{ color: theme.textPrimary, opacity: 0.6, fontSize: 12 }}>
               Drop an image here or click to browse
               <div style={{ marginTop: 8 }}>
-                <button className="btn" style={{ fontSize: 11 }} onClick={(e) => { e.stopPropagation(); handleFileSelect() }}>
-                  Choose File
-                </button>
+                <button className="btn" style={{ fontSize: 11, background: theme.card, borderColor: theme.cardBorder, color: theme.textPrimary }} onClick={(e) => { e.stopPropagation(); handleFileSelect() }}>Choose File</button>
               </div>
             </div>
           )}
         </div>
         <div className="sidebar-row" style={{ marginTop: 8 }}>
-          <label style={{ fontSize: 12, color: theme.textSecondary }}>Or enter Image URL</label>
+          <label style={{ fontSize: 12, color: theme.textPrimary, opacity: 0.7 }}>Or enter Image URL</label>
           <input
             className="input"
             value={block.image && !block.image.startsWith('data:') ? block.image : ''}
@@ -193,7 +196,7 @@ const BlockEditor = ({
         </div>
       </div>
       <div className="sidebar-row" style={{ marginTop: 12 }}>
-        <label style={{ fontSize: 12, color: theme.textSecondary }}>Color</label>
+        <label style={{ fontSize: 12, color: theme.textPrimary, opacity: 0.7 }}>Color</label>
         <div style={{ display: 'flex', gap: 8 }}>
           {['#58a6ff', '#3fb950', '#d29922', '#f85149', '#a371f7', '#f778ba'].map((c) => (
             <div
@@ -203,12 +206,15 @@ const BlockEditor = ({
               onClick={() => onUpdate({ color: c })}
             />
           ))}
+          <div
+            className={`color-swatch ${!block.color ? 'active' : ''}`}
+            style={{ background: 'transparent', border: '2px dashed ' + theme.cardBorder }}
+            onClick={() => onUpdate({ color: '' })}
+          />
         </div>
       </div>
       <div style={{ marginTop: 20 }}>
-        <button className="btn btn-danger" onClick={onDelete} style={{ width: '100%' }}>
-          Delete Block
-        </button>
+        <button className="btn btn-danger" onClick={onDelete} style={{ width: '100%', background: theme.danger, borderColor: theme.danger, color: '#fff' }}>Delete Block</button>
       </div>
     </div>
   )
@@ -228,7 +234,7 @@ const ConnectionEditor = ({
   <div className="sidebar-section">
     <div className="sidebar-label">Connection</div>
     <div className="sidebar-row">
-      <label style={{ fontSize: 12, color: theme.textSecondary }}>Routing</label>
+      <label style={{ fontSize: 12, color: theme.textPrimary, opacity: 0.7 }}>Routing</label>
       <select
         className="select"
         value={connection.routing}
@@ -241,9 +247,7 @@ const ConnectionEditor = ({
       </select>
     </div>
     <div style={{ marginTop: 20 }}>
-      <button className="btn btn-danger" onClick={onDelete} style={{ width: '100%' }}>
-        Delete Connection
-      </button>
+      <button className="btn btn-danger" onClick={onDelete} style={{ width: '100%', background: theme.danger, borderColor: theme.danger, color: '#fff' }}>Delete Connection</button>
     </div>
   </div>
 )

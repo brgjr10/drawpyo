@@ -33,6 +33,13 @@ export const exportCanvas = async (transparent = false): Promise<Blob | null> =>
   const layer = new Konva.Layer()
   stage.add(layer)
 
+  const container = document.createElement('div')
+  container.style.position = 'absolute'
+  container.style.top = '-9999px'
+  container.style.left = '-9999px'
+  document.body.appendChild(container)
+  stage.container(container)
+
   if (!transparent) {
     const bg = new Konva.Rect({
       x: 0,

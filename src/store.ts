@@ -12,6 +12,8 @@ interface AppState {
   activeTool: Tool
   sidebarCollapsed: boolean
   zoom: number
+  isDirty: boolean
+  originalProject: Project | null
   setTheme: (theme: ThemeName) => void
   setActiveTool: (tool: Tool) => void
   toggleSidebar: () => void
@@ -34,9 +36,26 @@ interface AppState {
   setSelectedConnectionId: (id: string | null) => void
   setViewport: (viewport: Project['viewport']) => void
   updateProjectMeta: (name: string, path: string) => void
+  markDirty: () => void
+  markClean: () => void
+  hasUnsavedChanges: () => boolean
 }
 
 const themes: Record<ThemeName, Theme> = {
+  dark: {
+    name: 'dark',
+    background: '#0d1117',
+    canvas: '#0a0a0a',
+    card: '#161b22',
+    cardBorder: '#30363d',
+    textPrimary: '#c9d1d9',
+    textSecondary: '#8b949e',
+    primary: '#58a6ff',
+    success: '#3fb950',
+    warning: '#d29922',
+    danger: '#f85149',
+    fontFamily: 'Inter, Segoe UI, sans-serif',
+  },
   monochrome: {
     name: 'monochrome',
     background: '#0d1117',
@@ -65,22 +84,8 @@ const themes: Record<ThemeName, Theme> = {
     danger: '#f87171',
     fontFamily: 'Inter, Segoe UI, sans-serif',
   },
-  dark: {
-    name: 'dark',
-    background: '#000000',
-    canvas: '#0a0a0a',
-    card: '#141414',
-    cardBorder: '#262626',
-    textPrimary: '#e5e5e5',
-    textSecondary: '#a3a3a3',
-    primary: '#3b82f6',
-    success: '#22c55e',
-    warning: '#eab308',
-    danger: '#ef4444',
-    fontFamily: 'Inter, Segoe UI, sans-serif',
-  },
-  bubble: {
-    name: 'bubble',
+  notepad: {
+    name: 'notepad',
     background: '#fdf6e3',
     canvas: '#fef9ef',
     card: '#ffffff',
@@ -106,6 +111,8 @@ export const useAppStore = create<AppState>((set, get) => ({
   activeTool: 'select',
   sidebarCollapsed: false,
   zoom: 1,
+  isDirty: false,
+  originalProject: null,
   setTheme: (theme) => set({ currentTheme: theme, theme: themes[theme] }),
   setActiveTool: (tool) => set({ activeTool: tool }),
   toggleSidebar: () => set((s) => ({ sidebarCollapsed: !s.sidebarCollapsed })),
@@ -116,24 +123,31 @@ export const useAppStore = create<AppState>((set, get) => ({
       theme: themes[get().currentTheme],
       selectedBlockIds: [],
       selectedConnectionId: null,
+      isDirty: false,
+      originalProject: project,
     }),
   clearProject: () =>
     set({
       project: null,
       selectedBlockIds: [],
       selectedConnectionId: null,
+      isDirty: false,
+      originalProject: null,
     }),
   setBlocks: (blocks) =>
     set((s) => ({
       project: s.project ? { ...s.project, blocks, updatedAt: new Date().toISOString() } : null,
+      isDirty: true,
     })),
   setConnections: (connections) =>
     set((s) => ({
       project: s.project ? { ...s.project, connections, updatedAt: new Date().toISOString() } : null,
+      isDirty: true,
     })),
   setGroups: (groups) =>
     set((s) => ({
       project: s.project ? { ...s.project, groups, updatedAt: new Date().toISOString() } : null,
+      isDirty: true,
     })),
   addBlock: (block) =>
     set((s) => {
@@ -144,6 +158,7 @@ export const useAppStore = create<AppState>((set, get) => ({
           blocks: [...s.project.blocks, block],
           updatedAt: new Date().toISOString(),
         },
+        isDirty: true,
       }
     }),
   updateBlock: (id, patch) =>
@@ -155,6 +170,7 @@ export const useAppStore = create<AppState>((set, get) => ({
           blocks: s.project.blocks.map((b) => (b.id === id ? { ...b, ...patch } : b)),
           updatedAt: new Date().toISOString(),
         },
+        isDirty: true,
       }
     }),
   deleteBlock: (id) =>
@@ -170,6 +186,7 @@ export const useAppStore = create<AppState>((set, get) => ({
           updatedAt: new Date().toISOString(),
         },
         selectedBlockIds: s.selectedBlockIds.filter((bid) => bid !== id),
+        isDirty: true,
       }
     }),
   addConnection: (connection) =>
@@ -181,6 +198,7 @@ export const useAppStore = create<AppState>((set, get) => ({
           connections: [...s.project.connections, connection],
           updatedAt: new Date().toISOString(),
         },
+        isDirty: true,
       }
     }),
   updateConnection: (id, patch) =>
@@ -194,6 +212,7 @@ export const useAppStore = create<AppState>((set, get) => ({
           ),
           updatedAt: new Date().toISOString(),
         },
+        isDirty: true,
       }
     }),
   deleteConnection: (id) =>
@@ -206,6 +225,7 @@ export const useAppStore = create<AppState>((set, get) => ({
           updatedAt: new Date().toISOString(),
         },
         selectedConnectionId: s.selectedConnectionId === id ? null : s.selectedConnectionId,
+        isDirty: true,
       }
     }),
   addGroup: (group) =>
@@ -217,6 +237,7 @@ export const useAppStore = create<AppState>((set, get) => ({
           groups: [...s.project.groups, group],
           updatedAt: new Date().toISOString(),
         },
+        isDirty: true,
       }
     }),
   updateGroup: (id, patch) =>
@@ -228,6 +249,7 @@ export const useAppStore = create<AppState>((set, get) => ({
           groups: s.project.groups.map((g) => (g.id === id ? { ...g, ...patch } : g)),
           updatedAt: new Date().toISOString(),
         },
+        isDirty: true,
       }
     }),
   deleteGroup: (id) =>
@@ -239,15 +261,17 @@ export const useAppStore = create<AppState>((set, get) => ({
           groups: s.project.groups.filter((g) => g.id !== id),
           updatedAt: new Date().toISOString(),
         },
+        isDirty: true,
       }
     }),
-  setSelectedBlockIds: (ids) => set({ selectedBlockIds: ids }),
+  setSelectedBlockIds: (ids) => set((state) => ({ selectedBlockIds: typeof ids === 'function' ? ids(state.selectedBlockIds) : ids })),
   setSelectedConnectionId: (id) => set({ selectedConnectionId: id }),
   setViewport: (viewport) =>
     set((s) => {
       if (!s.project) return s
       return {
         project: { ...s.project, viewport, updatedAt: new Date().toISOString() },
+        isDirty: true,
       }
     }),
   updateProjectMeta: (name, path) =>
@@ -255,6 +279,10 @@ export const useAppStore = create<AppState>((set, get) => ({
       if (!s.project) return s
       return {
         project: { ...s.project, name, path, updatedAt: new Date().toISOString() },
+        isDirty: true,
       }
     }),
+  markDirty: () => set({ isDirty: true }),
+  markClean: () => set({ isDirty: false }),
+  hasUnsavedChanges: () => get().isDirty,
 }))
