@@ -1,6 +1,9 @@
 {
-  "name": "drawpyo",
+  "name": "@brgjr10/drawpyo",
   "version": "0.1.0",
+  "publishConfig": {
+    "registry": "https://github.com"
+  },
   "description": "Visual project planning and diagramming tool",
   "main": "dist-electron/main.js",
   "scripts": {
