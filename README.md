@@ -1,6 +1,6 @@
 # Drawpyo
 
-<img width="1918" height="1079" alt="image" src="https://github.com/user-attachments/assets/b8a1b53a-ea36-493d-a05e-38103d4fd32b" />
+<img width="1365" height="768" alt="image" src="https://github.com/user-attachments/assets/d3d772a0-01f9-4074-8d54-fc2afae1023d" />
 
 Visual project planning and diagramming tool built with Electron, React, and Konva.
 
