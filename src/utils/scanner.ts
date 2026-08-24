@@ -63,8 +63,8 @@ export function applyScanResult(result: ScanResult) {
   const padding = 80
   const blockW = 160
   const blockH = 64
-  const gapX = 280
-  const gapY = 120
+  const gapX = 300
+  const gapY = 140
 
   const uniqueComponents = new Map<string, ScanComponent>()
   result.components.forEach((c) => {
@@ -85,43 +85,53 @@ export function applyScanResult(result: ScanResult) {
     const targetComp = components.find((c) => c.id === conn.target)
     if (!sourceComp || !targetComp) continue
     children[sourceComp.name] = children[sourceComp.name] || []
-    children[sourceComp.name].push(targetComp)
+    if (!children[sourceComp.name].find((c) => c.name === targetComp.name)) {
+      children[sourceComp.name].push(targetComp)
+    }
     parentCount[targetComp.name] = (parentCount[targetComp.name] || 0) + 1
   }
 
   const roots = components.filter((c) => !parentCount[c.name])
   const placed = new Set<string>()
   const idMap: Record<string, string> = {}
-  let maxLevel = 0
+  const levelNodes: Record<number, ScanComponent[]> = {}
+
+  const assignLevels = (item: ScanComponent, level: number) => {
+    if (placed.has(item.name)) return
+    placed.add(item.name)
+    levelNodes[level] = levelNodes[level] || []
+    levelNodes[level].push(item)
+    const childs = children[item.name] || []
+    childs.forEach((child) => assignLevels(child, level + 1))
+  }
+
+  roots.forEach((root) => assignLevels(root, 0))
+
+  components.forEach((c) => {
+    if (!placed.has(c.name)) {
+      const level = Object.keys(levelNodes).length
+      levelNodes[level] = levelNodes[level] || []
+      levelNodes[level].push(c)
+    }
+  })
 
   const blocks: Block[] = []
   const connections: Connection[] = []
 
-  const placeNodeWithBlock = (item: ScanComponent, level: number, index: number) => {
-    if (placed.has(item.name)) return
-    placed.add(item.name)
-    maxLevel = Math.max(maxLevel, level)
-    const x = padding + level * gapX
-    const y = padding + index * gapY
-    const techLabel = TECH_LABELS[item.technology] || item.technology
-    const title = item.name.length > 24 ? item.name.slice(0, 22) + '...' : item.name
-    const desc = [techLabel, item.file].filter(Boolean).join('\n')
-    const id = crypto.randomUUID()
-    idMap[item.name] = id
-    blocks.push({ id, title, description: desc, image: null, x, y, width: blockW, height: blockH, color: COLORS[item.type] || COLORS.module })
-
-    const childs = children[item.name] || []
-    childs.forEach((child, idx) => placeNodeWithBlock(child, level + 1, idx))
-  }
-
-  roots.forEach((root, idx) => placeNodeWithBlock(root, 0, idx))
-
-  components.forEach((c) => {
-    if (!placed.has(c.name)) {
-      const level = maxLevel + 1
-      const idx = blocks.filter((b) => Math.round((b.x - padding) / gapX) === level).length
-      placeNodeWithBlock(c, level, idx)
-    }
+  Object.entries(levelNodes).forEach(([level, nodes]) => {
+    const lvl = Number(level)
+    const totalHeight = nodes.length * gapY
+    const startY = padding
+    nodes.forEach((node, idx) => {
+      const techLabel = TECH_LABELS[node.technology] || node.technology
+      const title = node.name.length > 24 ? node.name.slice(0, 22) + '...' : node.name
+      const desc = [techLabel, node.file].filter(Boolean).join('\n')
+      const id = crypto.randomUUID()
+      idMap[node.name] = id
+      const x = padding + lvl * gapX
+      const y = startY + idx * gapY
+      blocks.push({ id, title, description: desc, image: null, x, y, width: blockW, height: blockH, color: COLORS[node.type] || COLORS.module })
+    })
   })
 
   for (const conn of result.connections) {
