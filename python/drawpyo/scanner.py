@@ -212,6 +212,13 @@ class ProjectScanner:
         self._trace_html_refs(files)
         self._trace_external_urls(files)
         self._trace_config_refs(files)
+        self._trace_function_calls(files)
+        self._trace_css_imports(files)
+        self._trace_templates(files)
+        self._trace_queries(files)
+        self._trace_queue_usage(files)
+        self._trace_event_emitters(files)
+        self._trace_shared_references(files)
         self._infer_file_connections()
         self._infer_type_connections()
 
@@ -959,6 +966,162 @@ class ProjectScanner:
                 for target in self.components:
                     if target.type == 'service' and target.technology == 'docker':
                         self._connect(c.id, target.id, 'builds', 0.6, f"docker build/service relationship")
+
+    def _trace_function_calls(self, files: List[Path]):
+        call_pattern = re.compile(r'([a-zA-Z_][a-zA-Z0-9_\.]*)\s*\(')
+        module_funcs: Dict[str, Dict[str, str]] = {}
+        for path in files:
+            text = self._read_file(path)
+            if not text:
+                continue
+            rel = self._rel_path(path)
+            comp = self._file_index.get(rel)
+            if not comp or comp.type != 'source':
+                continue
+            funcs = {}
+            for m in re.finditer(r'def\s+([a-zA-Z_][a-zA-Z0-9_]*)\s*\(', text):
+                funcs[m.group(1)] = rel
+            for m in re.finditer(r'([a-zA-Z_][a-zA-Z0-9_\.]*)\s*=\s*([a-zA-Z_][a-zA-Z0-9_\.]*)', text):
+                funcs[m.group(2)] = rel
+            module_funcs[rel] = funcs
+        for source_rel, funcs in module_funcs.items():
+            source_id = self._file_index.get(source_rel)
+            if not source_id:
+                continue
+            for func_name, defined_in in funcs.items():
+                if defined_in == source_rel:
+                    continue
+                target_id = self._file_index.get(defined_in)
+                if target_id:
+                    self._connect(source_id.id, target_id.id, 'calls', 0.7, f"function call: {func_name}")
+
+    def _trace_shared_references(self, files: List[Path]):
+        refs: Dict[str, List[str]] = {}
+        for path in files:
+            text = self._read_file(path)
+            if not text:
+                continue
+            rel = self._rel_path(path)
+            for m in re.finditer(r'["\']([^"\']+)["\']', text):
+                ref = m.group(1)
+                if '/' in ref or '\\' in ref or ref.endswith(('.py', '.js', '.ts', '.json', '.yaml', '.yml')):
+                    refs.setdefault(ref, []).append(rel)
+        for ref, files_list in refs.items():
+            if len(files_list) < 2:
+                continue
+            for i in range(len(files_list)):
+                for j in range(i + 1, len(files_list)):
+                    a = self._file_index.get(files_list[i])
+                    b = self._file_index.get(files_list[j])
+                    if a and b:
+                        self._connect(a.id, b.id, 'references', 0.6, f"shared ref: {ref}")
+
+    def _trace_css_imports(self, files: List[Path]):
+        for path in files:
+            text = self._read_file(path)
+            if not text:
+                continue
+            rel = self._rel_path(path)
+            comp = self._file_index.get(rel)
+            if not comp:
+                continue
+            for m in re.finditer(r'@import\s+["\']([^"\']+)["\']', text):
+                ref = m.group(1)
+                for target in self.components:
+                    if target.file.endswith(ref) or target.name == ref:
+                        self._connect(comp.id, target.id, 'imports', 0.9, f"CSS import: {ref}")
+                        break
+            for m in re.finditer(r'url\(["\']?([^"\')]+)["\']?\)', text):
+                ref = m.group(1)
+                for target in self.components:
+                    if target.file.endswith(ref) or target.name == ref:
+                        self._connect(comp.id, target.id, 'references', 0.8, f"CSS url: {ref}")
+                        break
+
+    def _trace_templates(self, files: List[Path]):
+        for path in files:
+            text = self._read_file(path)
+            if not text:
+                continue
+            rel = self._rel_path(path)
+            comp = self._file_index.get(rel)
+            if not comp:
+                continue
+            for m in re.finditer(r'{%\s*extends\s+["\']([^"\']+)["\']\s*%\}', text):
+                ref = m.group(1)
+                for target in self.components:
+                    if target.file.endswith(ref) or target.name == ref:
+                        self._connect(comp.id, target.id, 'extends', 0.9, f"template extends: {ref}")
+                        break
+            for m in re.finditer(r'{%\s*include\s+["\']([^"\']+)["\']\s*%\}', text):
+                ref = m.group(1)
+                for target in self.components:
+                    if target.file.endswith(ref) or target.name == ref:
+                        self._connect(comp.id, target.id, 'includes', 0.9, f"template include: {ref}")
+                        break
+
+    def _trace_queries(self, files: List[Path]):
+        table_pattern = re.compile(r'(?:from|join|into|update|delete from|truncate table)\s+([a-zA-Z_][a-zA-Z0-9_]*)', re.IGNORECASE)
+        for path in files:
+            text = self._read_file(path)
+            if not text:
+                continue
+            rel = self._rel_path(path)
+            comp = self._file_index.get(rel)
+            if not comp:
+                continue
+            for m in table_pattern.finditer(text):
+                table = m.group(1)
+                for target in self.components:
+                    if target.type == 'database' and target.name.lower() == table.lower():
+                        self._connect(comp.id, target.id, 'queries', 0.8, f"SQL table ref: {table}")
+                        break
+
+    def _trace_queue_usage(self, files: List[Path]):
+        producer_pattern = re.compile(r'(?:publish|send|produce|emit|dispatch|enqueue|schedule)\s*\(\s*["\']([^"\']+)["\']', re.IGNORECASE)
+        consumer_pattern = re.compile(r'(?:subscribe|consume|listen|on|addListener|on_message|task|job)\s*\(\s*["\']([^"\']+)["\']', re.IGNORECASE)
+        producers: Dict[str, List[str]] = defaultdict(list)
+        consumers: Dict[str, List[str]] = defaultdict(list)
+        for path in files:
+            text = self._read_file(path)
+            if not text:
+                continue
+            rel = self._rel_path(path)
+            comp = self._file_index.get(rel)
+            if not comp:
+                continue
+            for m in producer_pattern.finditer(text):
+                producers[m.group(1)].append(comp.id)
+            for m in consumer_pattern.finditer(text):
+                consumers[m.group(1)].append(comp.id)
+        for topic, p_ids in producers.items():
+            c_ids = consumers.get(topic, [])
+            for pid in p_ids:
+                for cid in c_ids:
+                    self._connect(pid, cid, 'publishes', 0.7, f"queue topic: {topic}")
+
+    def _trace_event_emitters(self, files: List[Path]):
+        emit_pattern = re.compile(r'\.emit\s*\(\s*["\']([^"\']+)["\']', re.IGNORECASE)
+        on_pattern = re.compile(r'\.on\s*\(\s*["\']([^"\']+)["\']', re.IGNORECASE)
+        emitters: Dict[str, List[str]] = defaultdict(list)
+        listeners: Dict[str, List[str]] = defaultdict(list)
+        for path in files:
+            text = self._read_file(path)
+            if not text:
+                continue
+            rel = self._rel_path(path)
+            comp = self._file_index.get(rel)
+            if not comp:
+                continue
+            for m in emit_pattern.finditer(text):
+                emitters[m.group(1)].append(comp.id)
+            for m in on_pattern.finditer(text):
+                listeners[m.group(1)].append(comp.id)
+        for event, e_ids in emitters.items():
+            l_ids = listeners.get(event, [])
+            for eid in e_ids:
+                for lid in l_ids:
+                    self._connect(eid, lid, 'emits', 0.7, f"event: {event}")
 
     def _get_component_id(self, rel_path: str) -> Optional[str]:
         comp = self._file_index.get(rel_path)
