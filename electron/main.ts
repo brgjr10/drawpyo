@@ -1,6 +1,7 @@
 import { app, BrowserWindow, ipcMain, dialog } from 'electron'
 import path from 'path'
 import fs from 'fs'
+import { spawn } from 'child_process'
 import { startServer, stopServer } from './server'
 
 let mainWindow: BrowserWindow | null = null
@@ -159,4 +160,55 @@ ipcMain.handle('fs:mkdir', async (_event, dirPath: string) => {
 
 ipcMain.handle('fs:readdir', async (_event, dirPath: string) => {
   return fs.readdirSync(dirPath)
+})
+
+ipcMain.handle('project:scan', async (_event, projectPath: string) => {
+  try {
+    const appPath = app.getAppPath()
+    const scannerPath = path.join(appPath, 'python', 'drawpyo', 'scanner.py')
+    if (!fs.existsSync(scannerPath)) {
+      return { error: `Scanner not found at ${scannerPath}` }
+    }
+
+    const pythonExe = process.platform === 'win32' ? 'python' : 'python3'
+    const child = spawn(pythonExe, [scannerPath, projectPath], {
+      cwd: path.join(appPath, 'python'),
+      env: { ...process.env, PYTHONIOENCODING: 'utf-8' },
+    })
+
+    const stdout: string[] = []
+    const stderr: string[] = []
+
+    child.stdout.on('data', (d) => stdout.push(d.toString()))
+    child.stderr.on('data', (d) => stderr.push(d.toString()))
+
+    const result = await new Promise<{ ok: boolean; data?: any; error?: string }>((resolve) => {
+      child.on('close', (code) => {
+        const out = stdout.join('').trim()
+        const err = stderr.join('').trim()
+        if (code !== 0) {
+          resolve({ ok: false, error: err || `Scanner exited with code ${code}` })
+          return
+        }
+        if (!out) {
+          resolve({ ok: false, error: 'Scanner produced no output' })
+          return
+        }
+        try {
+          resolve({ ok: true, data: JSON.parse(out) })
+        } catch (e) {
+          resolve({ ok: false, error: `Invalid JSON: ${out.slice(0, 200)}` })
+        }
+      })
+      child.on('error', (err) => resolve({ ok: false, error: err.message }))
+    })
+
+    if (!result.ok) {
+      return { error: result.error }
+    }
+
+    return { success: true, data: result.data }
+  } catch (e: any) {
+    return { error: e.message || 'Scan failed' }
+  }
 })

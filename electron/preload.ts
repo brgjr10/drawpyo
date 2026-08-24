@@ -11,4 +11,5 @@ contextBridge.exposeInMainWorld('electronAPI', {
   exists: (filePath: string) => ipcRenderer.invoke('fs:exists', filePath),
   mkdir: (dirPath: string) => ipcRenderer.invoke('fs:mkdir', dirPath),
   readdir: (dirPath: string) => ipcRenderer.invoke('fs:readdir', dirPath),
+  scanProject: (projectPath: string) => ipcRenderer.invoke('project:scan', projectPath),
 })

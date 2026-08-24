@@ -9,6 +9,7 @@ export interface ElectronAPI {
   exists: (filePath: string) => Promise<boolean>
   mkdir: (dirPath: string) => Promise<boolean>
   readdir: (dirPath: string) => Promise<string[]>
+  scanProject: (projectPath: string) => Promise<{ success?: boolean; data?: any; error?: string }>
 }
 
 declare global {

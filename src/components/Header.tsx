@@ -3,6 +3,7 @@ import { useTheme } from './ThemeProvider'
 import { useAppStore } from '../store'
 import { Project } from '../types'
 import { PromptDialog } from './PromptDialog'
+import { applyScanResult } from '../utils/scanner'
 
 export const Header = () => {
   const theme = useTheme()
@@ -10,6 +11,7 @@ export const Header = () => {
   const [promptOpen, setPromptOpen] = useState(false)
   const [pendingProjectPath, setPendingProjectPath] = useState<string | null>(null)
   const [saveStatus, setSaveStatus] = useState<string | null>(null)
+  const [scanStatus, setScanStatus] = useState<string | null>(null)
 
   const showSaveStatus = useCallback((msg: string) => {
     setSaveStatus(msg)
@@ -96,6 +98,28 @@ export const Header = () => {
     reader.readAsArrayBuffer(blob)
   }
 
+  const handleAutoScan = async () => {
+    const { project: proj } = useAppStore.getState()
+    if (!proj) return
+    setScanStatus('Scanning...')
+    try {
+      const result = await window.electronAPI.scanProject(proj.path)
+      if (result.error) {
+        setScanStatus(`Scan failed: ${result.error}`)
+        setTimeout(() => setScanStatus(null), 4000)
+        return
+      }
+      if (result.data) {
+        applyScanResult(result.data)
+        setScanStatus(`Scan complete: ${result.data.components?.length || 0} components found`)
+        setTimeout(() => setScanStatus(null), 4000)
+      }
+    } catch (e: any) {
+      setScanStatus(`Scan error: ${e.message}`)
+      setTimeout(() => setScanStatus(null), 4000)
+    }
+  }
+
   return (
     <div className="header" style={{ background: theme.theme.card, borderBottomColor: theme.theme.cardBorder }}>
       <div className="header-title" style={{ color: theme.theme.textPrimary }}>
@@ -113,12 +137,17 @@ export const Header = () => {
           <button className="btn" onClick={handleOpenProject} style={{ background: theme.theme.card, borderColor: theme.theme.cardBorder, color: theme.theme.textPrimary }}>Open</button>
           <button className="btn btn-primary" onClick={handleSave} style={{ background: theme.theme.primary, borderColor: theme.theme.primary, color: '#fff' }}>Save</button>
           <button className="btn" onClick={handleExportImage} style={{ background: theme.theme.card, borderColor: theme.theme.cardBorder, color: theme.theme.textPrimary }}>Export</button>
+          <button className="btn" onClick={handleAutoScan} style={{ background: theme.theme.success, borderColor: theme.theme.success, color: '#fff' }}>Auto-Scan</button>
           <button className="btn btn-danger" onClick={handleClose} style={{ background: theme.theme.danger, borderColor: theme.theme.danger, color: '#fff' }}>Close</button>
         </>
       )}
 
       {saveStatus && (
         <span style={{ color: theme.theme.success, fontSize: 12, marginLeft: 8 }}>{saveStatus}</span>
+      )}
+
+      {scanStatus && (
+        <span style={{ color: theme.theme.warning, fontSize: 12, marginLeft: 8 }}>{scanStatus}</span>
       )}
 
       <div style={{ width: 1, height: 24, background: theme.theme.cardBorder, margin: '0 8px' }} />

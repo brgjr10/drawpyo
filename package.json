@@ -1,6 +1,6 @@
 {
   "name": "@brgjr10/drawpyo",
-  "version": "0.1.0",
+  "version": "1.0.1",
   "publishConfig": {
     "registry": "https://npm.pkg.github.com"
   },
@@ -46,7 +46,8 @@
     "asar": false,
     "files": [
       "dist/**/*",
-      "dist-electron/**/*"
+      "dist-electron/**/*",
+      "python/**/*"
     ],
     "win": {
       "target": "nsis"
