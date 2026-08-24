@@ -57,9 +57,6 @@ export function applyScanResult(result: ScanResult) {
   const { setBlocks, setConnections, setViewport } = useAppStore.getState()
   if (!result.components.length) return
 
-  const existingBlocks = useAppStore.getState().project?.blocks ?? []
-  const existingKeys = new Set(existingBlocks.map((b) => b.title.trim().toLowerCase()))
-
   const padding = 80
   const blockW = 160
   const blockH = 64
@@ -68,8 +65,8 @@ export function applyScanResult(result: ScanResult) {
 
   const uniqueComponents = new Map<string, ScanComponent>()
   result.components.forEach((c) => {
-    const key = c.name.trim().toLowerCase()
-    if (!uniqueComponents.has(key) && !existingKeys.has(key)) {
+    const key = `${c.name.trim().toLowerCase()}|||${c.file.trim().toLowerCase()}`
+    if (!uniqueComponents.has(key)) {
       uniqueComponents.set(key, c)
     }
   })
@@ -98,7 +95,7 @@ export function applyScanResult(result: ScanResult) {
       const title = item.name.length > 24 ? item.name.slice(0, 22) + '...' : item.name
       const desc = [techLabel, item.file].filter(Boolean).join('\n')
       const id = crypto.randomUUID()
-      idMap[item.name] = id
+      idMap[item.name + '\x00' + item.file] = id
       const x = padding + col * gapX
       const y = padding + row * gapY
       blocks.push({ id, title, description: desc, image: null, x, y, width: blockW, height: blockH, color: COLORS[item.type] || COLORS.module })
@@ -110,8 +107,8 @@ export function applyScanResult(result: ScanResult) {
     const sourceComp = components.find((c) => c.id === conn.source)
     const targetComp = components.find((c) => c.id === conn.target)
     if (!sourceComp || !targetComp) continue
-    const fromId = idMap[sourceComp.name]
-    const toId = idMap[targetComp.name]
+    const fromId = idMap[sourceComp.name + '\x00' + sourceComp.file]
+    const toId = idMap[targetComp.name + '\x00' + targetComp.file]
     if (fromId && toId) {
       connections.push({
         id: crypto.randomUUID(),
