@@ -63,8 +63,8 @@ export function applyScanResult(result: ScanResult) {
   const padding = 80
   const blockW = 160
   const blockH = 64
-  const gapX = 300
-  const gapY = 140
+  const gapX = 320
+  const gapY = 150
 
   const uniqueComponents = new Map<string, ScanComponent>()
   result.components.forEach((c) => {
@@ -77,62 +77,34 @@ export function applyScanResult(result: ScanResult) {
   const components = Array.from(uniqueComponents.values())
   if (!components.length) return
 
-  const children: Record<string, ScanComponent[]> = {}
-  const parentCount: Record<string, number> = {}
-
-  for (const conn of result.connections) {
-    const sourceComp = components.find((c) => c.id === conn.source)
-    const targetComp = components.find((c) => c.id === conn.target)
-    if (!sourceComp || !targetComp) continue
-    children[sourceComp.name] = children[sourceComp.name] || []
-    if (!children[sourceComp.name].find((c) => c.name === targetComp.name)) {
-      children[sourceComp.name].push(targetComp)
-    }
-    parentCount[targetComp.name] = (parentCount[targetComp.name] || 0) + 1
+  const typeOrder = ['api', 'database', 'queue', 'cloud', 'service', 'module', 'style', 'template', 'test', 'config', 'build', 'docs', 'data']
+  const grouped: Record<string, ScanComponent[]> = {}
+  for (const c of components) {
+    const t = c.type || 'module'
+    grouped[t] = grouped[t] || []
+    grouped[t].push(c)
   }
-
-  const roots = components.filter((c) => !parentCount[c.name])
-  const placed = new Set<string>()
-  const idMap: Record<string, string> = {}
-  const levelNodes: Record<number, ScanComponent[]> = {}
-
-  const assignLevels = (item: ScanComponent, level: number) => {
-    if (placed.has(item.name)) return
-    placed.add(item.name)
-    levelNodes[level] = levelNodes[level] || []
-    levelNodes[level].push(item)
-    const childs = children[item.name] || []
-    childs.forEach((child) => assignLevels(child, level + 1))
-  }
-
-  roots.forEach((root) => assignLevels(root, 0))
-
-  components.forEach((c) => {
-    if (!placed.has(c.name)) {
-      const level = Object.keys(levelNodes).length
-      levelNodes[level] = levelNodes[level] || []
-      levelNodes[level].push(c)
-    }
-  })
 
   const blocks: Block[] = []
   const connections: Connection[] = []
+  const idMap: Record<string, string> = {}
 
-  Object.entries(levelNodes).forEach(([level, nodes]) => {
-    const lvl = Number(level)
-    const totalHeight = nodes.length * gapY
-    const startY = padding
-    nodes.forEach((node, idx) => {
-      const techLabel = TECH_LABELS[node.technology] || node.technology
-      const title = node.name.length > 24 ? node.name.slice(0, 22) + '...' : node.name
-      const desc = [techLabel, node.file].filter(Boolean).join('\n')
+  let col = 0
+  for (const type of typeOrder) {
+    const items = grouped[type] || []
+    if (!items.length) continue
+    items.forEach((item, row) => {
+      const techLabel = TECH_LABELS[item.technology] || item.technology
+      const title = item.name.length > 24 ? item.name.slice(0, 22) + '...' : item.name
+      const desc = [techLabel, item.file].filter(Boolean).join('\n')
       const id = crypto.randomUUID()
-      idMap[node.name] = id
-      const x = padding + lvl * gapX
-      const y = startY + idx * gapY
-      blocks.push({ id, title, description: desc, image: null, x, y, width: blockW, height: blockH, color: COLORS[node.type] || COLORS.module })
+      idMap[item.name] = id
+      const x = padding + col * gapX
+      const y = padding + row * gapY
+      blocks.push({ id, title, description: desc, image: null, x, y, width: blockW, height: blockH, color: COLORS[item.type] || COLORS.module })
     })
-  })
+    col++
+  }
 
   for (const conn of result.connections) {
     const sourceComp = components.find((c) => c.id === conn.source)
