@@ -3,11 +3,11 @@ import { useTheme } from './ThemeProvider'
 import { useAppStore } from '../store'
 import { Project } from '../types'
 import { PromptDialog } from './PromptDialog'
-import { applyScanResult } from '../utils/scanner'
+import { applyScanResult, regroupAll } from '../utils/scanner'
 
 export const Header = () => {
   const theme = useTheme()
-  const { currentTheme, setTheme, project, clearProject, isDirty, markClean } = useAppStore()
+  const { currentTheme, setTheme, project, clearProject, isDirty, markClean, setConnectionRouting, removeLooseBlocks } = useAppStore()
   const [promptOpen, setPromptOpen] = useState(false)
   const [pendingProjectPath, setPendingProjectPath] = useState<string | null>(null)
   const [saveStatus, setSaveStatus] = useState<string | null>(null)
@@ -120,6 +120,20 @@ export const Header = () => {
     }
   }
 
+  const handleRegroupAll = () => {
+    regroupAll()
+    showSaveStatus('Regrouped!')
+  }
+
+  const handleRemoveLooseBlocks = () => {
+    removeLooseBlocks()
+    showSaveStatus('Loose blocks removed!')
+  }
+
+  const handleRoutingChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    setConnectionRouting(e.target.value as any)
+  }
+
   return (
     <div className="header" style={{ background: theme.theme.card, borderBottomColor: theme.theme.cardBorder }}>
       <div className="header-title" style={{ color: theme.theme.textPrimary }}>
@@ -138,6 +152,13 @@ export const Header = () => {
           <button className="btn btn-primary" onClick={handleSave} style={{ background: theme.theme.primary, borderColor: theme.theme.primary, color: '#fff' }}>Save</button>
           <button className="btn" onClick={handleExportImage} style={{ background: theme.theme.card, borderColor: theme.theme.cardBorder, color: theme.theme.textPrimary }}>Export</button>
           <button className="btn" onClick={handleAutoScan} style={{ background: theme.theme.success, borderColor: theme.theme.success, color: '#fff' }}>Auto-Scan</button>
+          <button className="btn" onClick={handleRegroupAll} style={{ background: theme.theme.card, borderColor: theme.theme.cardBorder, color: theme.theme.textPrimary }}>Regroup All</button>
+          <button className="btn" onClick={handleRemoveLooseBlocks} style={{ background: theme.theme.danger, borderColor: theme.theme.danger, color: '#fff' }}>Remove Loose</button>
+          <select className="select" onChange={handleRoutingChange} defaultValue="squared" style={{ background: theme.theme.background, color: theme.theme.textPrimary, borderColor: theme.theme.cardBorder, padding: '4px 8px', fontSize: 12 }}>
+            <option value="squared">Squared Lines</option>
+            <option value="curved">Curved Lines</option>
+            <option value="user-guided">Straight</option>
+          </select>
           <button className="btn btn-danger" onClick={handleClose} style={{ background: theme.theme.danger, borderColor: theme.theme.danger, color: '#fff' }}>Close</button>
         </>
       )}

@@ -37,8 +37,12 @@ export const exportCanvas = async (transparent = false): Promise<Blob | null> =>
   container.style.position = 'absolute'
   container.style.top = '-9999px'
   container.style.left = '-9999px'
+  container.style.width = '1920px'
+  container.style.height = '1080px'
   document.body.appendChild(container)
   stage.container(container)
+
+  await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)))
 
   if (!transparent) {
     const bg = new Konva.Rect({
@@ -153,10 +157,15 @@ export const exportCanvas = async (transparent = false): Promise<Blob | null> =>
     const lastIdx = points.length - 2
     const arrowAngle = Math.atan2(points[lastIdx + 1] - points[lastIdx - 1], points[lastIdx] - points[lastIdx - 2])
     const arrowSize = 10
-    const ax1 = points[lastIdx] - arrowSize * Math.cos(arrowAngle - Math.PI / 6)
-    const ay1 = points[lastIdx + 1] - arrowSize * Math.sin(arrowAngle - Math.PI / 6)
-    const ax2 = points[lastIdx] - arrowSize * Math.cos(arrowAngle + Math.PI / 6)
-    const ay2 = points[lastIdx + 1] - arrowSize * Math.sin(arrowAngle + Math.PI / 6)
+    const ax1 = points[lastIdx] - arrowSize * Math.cos(arrowAngle + Math.PI / 6)
+    const ay1 = points[lastIdx + 1] - arrowSize * Math.sin(arrowAngle + Math.PI / 6)
+    const ax2 = points[lastIdx] - arrowSize * Math.cos(arrowAngle - Math.PI / 6)
+    const ay2 = points[lastIdx + 1] - arrowSize * Math.sin(arrowAngle - Math.PI / 6)
+    const startArrowAngle = Math.atan2(points[3] - points[1], points[2] - points[0])
+    const sax1 = points[0] - arrowSize * Math.cos(startArrowAngle + Math.PI / 6)
+    const say1 = points[1] - arrowSize * Math.sin(startArrowAngle + Math.PI / 6)
+    const sax2 = points[0] - arrowSize * Math.cos(startArrowAngle - Math.PI / 6)
+    const say2 = points[1] - arrowSize * Math.sin(startArrowAngle - Math.PI / 6)
 
     const arrow = new Konva.Line({
       points: [points[lastIdx], points[lastIdx + 1], ax1, ay1, ax2, ay2],
@@ -166,6 +175,15 @@ export const exportCanvas = async (transparent = false): Promise<Blob | null> =>
       strokeWidth: 1,
     })
     layer.add(arrow)
+
+    const startArrow = new Konva.Line({
+      points: [points[0], points[1], sax1, say1, sax2, say2],
+      closed: true,
+      fill: theme.textSecondary,
+      stroke: theme.textSecondary,
+      strokeWidth: 1,
+    })
+    layer.add(startArrow)
   })
 
   layer.draw()

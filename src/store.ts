@@ -39,6 +39,8 @@ interface AppState {
   markDirty: () => void
   markClean: () => void
   hasUnsavedChanges: () => boolean
+  setConnectionRouting: (routing: Connection['routing']) => void
+  removeLooseBlocks: () => void
 }
 
 const themes: Record<ThemeName, Theme> = {
@@ -261,11 +263,44 @@ export const useAppStore = create<AppState>((set, get) => ({
           groups: s.project.groups.filter((g) => g.id !== id),
           updatedAt: new Date().toISOString(),
         },
-        isDirty: true,
       }
     }),
   setSelectedBlockIds: (ids) => set((state) => ({ selectedBlockIds: typeof ids === 'function' ? ids(state.selectedBlockIds) : ids })),
   setSelectedConnectionId: (id) => set({ selectedConnectionId: id }),
+  setConnectionRouting: (routing) =>
+    set((s) => {
+      if (!s.project) return s
+      return {
+        project: {
+          ...s.project,
+          connections: s.project.connections.map((c) => ({ ...c, routing, waypoints: routing === 'user-guided' ? c.waypoints : [] })),
+          updatedAt: new Date().toISOString(),
+        },
+        isDirty: true,
+      }
+    }),
+  removeLooseBlocks: () =>
+    set((s) => {
+      if (!s.project) return s
+      const connectedIds = new Set<string>()
+      s.project.connections.forEach((c) => {
+        connectedIds.add(c.fromBlockId)
+        connectedIds.add(c.toBlockId)
+      })
+      const newBlocks = s.project.blocks.filter((b) => connectedIds.has(b.id))
+      const newConnections = s.project.connections.filter((c) => connectedIds.has(c.fromBlockId) && connectedIds.has(c.toBlockId))
+      const newSelected = s.selectedBlockIds.filter((id) => connectedIds.has(id))
+      return {
+        project: {
+          ...s.project,
+          blocks: newBlocks,
+          connections: newConnections,
+          updatedAt: new Date().toISOString(),
+        },
+        selectedBlockIds: newSelected,
+        isDirty: true,
+      }
+    }),
   setViewport: (viewport) =>
     set((s) => {
       if (!s.project) return s

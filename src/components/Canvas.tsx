@@ -31,6 +31,7 @@ export const Canvas = () => {
   const addBlock = useAppStore((s) => s.addBlock)
   const updateBlock = useAppStore((s) => s.updateBlock)
   const addConnection = useAppStore((s) => s.addConnection)
+  const updateConnection = useAppStore((s) => s.updateConnection)
 
   const [selectionRect, setSelectionRect] = useState<{ x: number; y: number; width: number; height: number } | null>(null)
   const [connectingFrom, setConnectingFrom] = useState<string | null>(null)
@@ -73,6 +74,24 @@ export const Canvas = () => {
       }
     })
   }, [project?.blocks.map((b) => b.image).join(',')])
+
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Delete' || e.key === 'Backspace') {
+        const { selectedBlockIds, selectedConnectionId, deleteBlock, deleteConnection, project } = useAppStore.getState()
+        if (selectedBlockIds.length > 0) {
+          selectedBlockIds.forEach((id) => deleteBlock(id))
+          useAppStore.getState().setSelectedBlockIds([])
+        }
+        if (selectedConnectionId) {
+          deleteConnection(selectedConnectionId)
+          useAppStore.getState().setSelectedConnectionId(null)
+        }
+      }
+    }
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [])
 
   useEffect(() => {
     const updateSize = () => {
@@ -358,10 +377,16 @@ export const Canvas = () => {
             const ay1 = points[lastIdx + 1] - arrowSize * Math.sin(arrowAngle + Math.PI / 6)
             const ax2 = points[lastIdx] - arrowSize * Math.cos(arrowAngle - Math.PI / 6)
             const ay2 = points[lastIdx + 1] - arrowSize * Math.sin(arrowAngle - Math.PI / 6)
+            const startArrowAngle = Math.atan2(points[3] - points[1], points[2] - points[0])
+            const sax1 = points[0] - arrowSize * Math.cos(startArrowAngle + Math.PI / 6)
+            const say1 = points[1] - arrowSize * Math.sin(startArrowAngle + Math.PI / 6)
+            const sax2 = points[0] - arrowSize * Math.cos(startArrowAngle - Math.PI / 6)
+            const say2 = points[1] - arrowSize * Math.sin(startArrowAngle - Math.PI / 6)
             return (
               <Group key={conn.id}>
                 <Line points={points} stroke={isSelected ? theme.theme.primary : theme.theme.textSecondary} strokeWidth={isSelected ? 3 : 2} hitStrokeWidth={12} onClick={(e) => handleConnectionClick(conn.id, e)} onTap={(e) => handleConnectionClick(conn.id, e)} />
                 <Line points={[points[lastIdx], points[lastIdx + 1], ax1, ay1, ax2, ay2]} closed fill={isSelected ? theme.theme.primary : theme.theme.textSecondary} stroke={isSelected ? theme.theme.primary : theme.theme.textSecondary} strokeWidth={1} listening={false} />
+                <Line points={[points[0], points[1], sax1, say1, sax2, say2]} closed fill={isSelected ? theme.theme.primary : theme.theme.textSecondary} stroke={isSelected ? theme.theme.primary : theme.theme.textSecondary} strokeWidth={1} listening={false} />
                 {isSelected && conn.routing === 'user-guided' && conn.waypoints.map((wp, idx) => (
                   <Rect key={idx} x={wp.x - 5} y={wp.y - 5} width={10} height={10} fill={theme.theme.card} stroke={theme.theme.primary} strokeWidth={2} draggable onDragMove={(e) => handleWaypointDragMove(conn.id, idx, e)} onDragEnd={(e) => handleWaypointDragEnd(conn.id, idx, e)} />
                 ))}
