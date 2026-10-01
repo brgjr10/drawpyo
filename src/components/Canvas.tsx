@@ -44,6 +44,28 @@ export const Canvas = () => {
   const isPanningRef = useRef(false)
   const panStartRef = useRef<{ x: number; y: number; stageX: number; stageY: number } | null>(null)
 
+  // Konva pointer events can fire more than once per frame, so drag positions are
+  // accumulated here and written to the store at most once per animation frame.
+  const pendingDragRef = useRef<Map<string, Point>>(new Map())
+  const dragFrameRef = useRef<number | null>(null)
+
+  const flushPendingDrag = useCallback(() => {
+    dragFrameRef.current = null
+    if (pendingDragRef.current.size === 0) return
+    const updates = Array.from(pendingDragRef.current.entries())
+    pendingDragRef.current.clear()
+    updates.forEach(([id, pos]) => updateBlock(id, { x: pos.x, y: pos.y }))
+  }, [updateBlock])
+
+  const scheduleDragFlush = useCallback(() => {
+    if (dragFrameRef.current !== null) return
+    dragFrameRef.current = requestAnimationFrame(flushPendingDrag)
+  }, [flushPendingDrag])
+
+  useEffect(() => () => {
+    if (dragFrameRef.current !== null) cancelAnimationFrame(dragFrameRef.current)
+  }, [])
+
   const imageCache = useRef<Map<string, ImageDim>>(new Map())
 
   useEffect(() => {
@@ -190,6 +212,7 @@ export const Canvas = () => {
   }
 
   const handleStageMouseUp = (_e: Konva.KonvaEventObject<MouseEvent>) => {
+    flushPendingDrag()
     if (isPanningRef.current) {
       isPanningRef.current = false
       const stage = stageRef.current
@@ -233,14 +256,16 @@ export const Canvas = () => {
       const dx = e.target.x() - dragOrigin.x
       const dy = e.target.y() - dragOrigin.y
       dragStartPositions.forEach((pos) => {
-        updateBlock(pos.id, { x: pos.x + dx, y: pos.y + dy })
+        pendingDragRef.current.set(pos.id, { x: pos.x + dx, y: pos.y + dy })
       })
     } else {
-      updateBlock(block.id, { x: e.target.x(), y: e.target.y() })
+      pendingDragRef.current.set(block.id, { x: e.target.x(), y: e.target.y() })
     }
+    scheduleDragFlush()
   }
 
   const handleBlockDragEnd = (block: Block, e: Konva.KonvaEventObject<DragEvent>) => {
+    flushPendingDrag()
     setDragStartPositions([])
     setDragOrigin(null)
     updateBlock(block.id, { x: e.target.x(), y: e.target.y() })
