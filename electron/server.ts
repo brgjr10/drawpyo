@@ -1,10 +1,12 @@
 import http from 'http'
 import { URL } from 'url'
 import { useAppStore } from '../src/store'
+import path from 'path'
+import fs from 'fs'
 
 const PORT = 9749
 
-type RequestHandler = (req: http.IncomingMessage, res: http.ServerResponse, body: any) => void
+type RequestHandler = (req: http.IncomingMessage, res: http.ServerResponse, body: any, params: Record<string, string>) => void
 
 const routes: { method: string; path: string; handler: RequestHandler }[] = []
 
@@ -12,13 +14,25 @@ function addRoute(method: string, path: string, handler: RequestHandler) {
   routes.push({ method, path, handler })
 }
 
-function matchRoute(method: string, reqPath: string): RequestHandler | null {
+function matchRoute(method: string, reqPath: string): { handler: RequestHandler; params: Record<string, string> } | null {
   for (const route of routes) {
     if (route.method !== method) continue
     const routeParts = route.path.split('/')
     const reqParts = reqPath.split('/')
     if (routeParts.length !== reqParts.length) continue
-    return route.handler
+    const params: Record<string, string> = {}
+    let match = true
+    for (let i = 0; i < routeParts.length; i++) {
+      if (routeParts[i].startsWith(':')) {
+        params[routeParts[i].slice(1)] = reqParts[i]
+      } else if (routeParts[i] !== reqParts[i]) {
+        match = false
+        break
+      }
+    }
+    if (match) {
+      return { handler: route.handler, params }
+    }
   }
   return null
 }
@@ -51,11 +65,30 @@ function methodNotAllowed(res: http.ServerResponse) {
   json(res, 405, { error: 'Method not allowed' })
 }
 
-addRoute('GET', '/health', (_req, res) => {
+const APP_ORIGIN = 'http://localhost:5173'
+
+function setCorsHeaders(res: http.ServerResponse) {
+  res.setHeader('Access-Control-Allow-Origin', APP_ORIGIN)
+  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS')
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type')
+}
+
+function resolveProjectRoot(reqPath: string): string | null {
+  const { project } = useAppStore.getState()
+  if (!project) return null
+  const projectRoot = path.resolve(project.path)
+  const requestedPath = path.resolve(projectRoot, reqPath)
+  if (!requestedPath.startsWith(projectRoot + path.sep) && requestedPath !== projectRoot) {
+    return null
+  }
+  return requestedPath
+}
+
+addRoute('GET', '/health', (_req, res, _body, _params) => {
   json(res, 200, { status: 'ok' })
 })
 
-addRoute('GET', '/projects', (_req, res) => {
+addRoute('GET', '/projects', (_req, res, _body, _params) => {
   const { project } = useAppStore.getState()
   if (!project) {
     json(res, 200, [])
@@ -71,25 +104,46 @@ addRoute('GET', '/projects', (_req, res) => {
   ])
 })
 
-addRoute('GET', '/projects/:id', (req, res, _body) => {
-  const { id } = (req as any).params as { id: string }
+addRoute('GET', '/projects/:id', (req, res, _body, params) => {
   const { project } = useAppStore.getState()
-  if (!project || project.id !== id) {
+  if (!project || project.id !== params.id) {
     json(res, 404, { error: 'Project not found' })
     return
   }
   json(res, 200, project)
 })
 
-addRoute('POST', '/projects', (_req, res, body) => {
-  const { project } = useAppStore.getState()
-  json(res, 200, { success: true, project })
+addRoute('POST', '/projects', (_req, res, body, _params) => {
+  const { name, path: projectPath } = body || {}
+  if (!name || !projectPath) {
+    json(res, 400, { error: 'name and path are required' })
+    return
+  }
+  try {
+    fs.mkdirSync(projectPath, { recursive: true })
+    const proj = {
+      id: crypto.randomUUID(),
+      name,
+      path: projectPath,
+      blocks: [],
+      connections: [],
+      groups: [],
+      viewport: { x: 0, y: 0, scale: 1 },
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    }
+    const projectFile = path.join(projectPath, 'project.json')
+    fs.writeFileSync(projectFile, JSON.stringify(proj, null, 2), 'utf-8')
+    useAppStore.getState().loadProject(proj)
+    json(res, 200, { success: true, project: proj })
+  } catch (e: any) {
+    json(res, 500, { error: e.message || 'Failed to create project' })
+  }
 })
 
-addRoute('POST', '/projects/:id/blocks', (req, res, body) => {
-  const { id } = (req as any).params as { id: string }
+addRoute('POST', '/projects/:id/blocks', (req, res, body, params) => {
   const { project, addBlock } = useAppStore.getState()
-  if (!project || project.id !== id) {
+  if (!project || project.id !== params.id) {
     json(res, 404, { error: 'Project not found' })
     return
   }
@@ -108,10 +162,9 @@ addRoute('POST', '/projects/:id/blocks', (req, res, body) => {
   json(res, 200, { success: true, block })
 })
 
-addRoute('POST', '/projects/:id/connections', (req, res, body) => {
-  const { id } = (req as any).params as { id: string }
+addRoute('POST', '/projects/:id/connections', (req, res, body, params) => {
   const { project, addConnection } = useAppStore.getState()
-  if (!project || project.id !== id) {
+  if (!project || project.id !== params.id) {
     json(res, 404, { error: 'Project not found' })
     return
   }
@@ -128,54 +181,49 @@ addRoute('POST', '/projects/:id/connections', (req, res, body) => {
   json(res, 200, { success: true, connection })
 })
 
-addRoute('PUT', '/projects/:id/blocks/:blockId', (req, res, body) => {
-  const { id, blockId } = (req as any).params as { id: string; blockId: string }
+addRoute('PUT', '/projects/:id/blocks/:blockId', (req, res, body, params) => {
   const { project, updateBlock } = useAppStore.getState()
-  if (!project || project.id !== id) {
+  if (!project || project.id !== params.id) {
     json(res, 404, { error: 'Project not found' })
     return
   }
-  updateBlock(blockId, body)
+  updateBlock(params.blockId, body)
   json(res, 200, { success: true })
 })
 
-addRoute('DELETE', '/projects/:id/blocks/:blockId', (req, res) => {
-  const { id, blockId } = (req as any).params as { id: string; blockId: string }
+addRoute('DELETE', '/projects/:id/blocks/:blockId', (req, res, _body, params) => {
   const { project, deleteBlock } = useAppStore.getState()
-  if (!project || project.id !== id) {
+  if (!project || project.id !== params.id) {
     json(res, 404, { error: 'Project not found' })
     return
   }
-  deleteBlock(blockId)
+  deleteBlock(params.blockId)
   json(res, 200, { success: true })
 })
 
-addRoute('DELETE', '/projects/:id/connections/:connectionId', (req, res) => {
-  const { id, connectionId } = (req as any).params as { id: string; connectionId: string }
+addRoute('DELETE', '/projects/:id/connections/:connectionId', (req, res, _body, params) => {
   const { project, deleteConnection } = useAppStore.getState()
-  if (!project || project.id !== id) {
+  if (!project || project.id !== params.id) {
     json(res, 404, { error: 'Project not found' })
     return
   }
-  deleteConnection(connectionId)
+  deleteConnection(params.connectionId)
   json(res, 200, { success: true })
 })
 
-addRoute('PUT', '/projects/:id/connections/:connectionId', (req, res, body) => {
-  const { id, connectionId } = (req as any).params as { id: string; connectionId: string }
+addRoute('PUT', '/projects/:id/connections/:connectionId', (req, res, body, params) => {
   const { project, updateConnection } = useAppStore.getState()
-  if (!project || project.id !== id) {
+  if (!project || project.id !== params.id) {
     json(res, 404, { error: 'Project not found' })
     return
   }
-  updateConnection(connectionId, body)
+  updateConnection(params.connectionId, body)
   json(res, 200, { success: true })
 })
 
-addRoute('POST', '/projects/:id/export', (req, res, body) => {
-  const { id } = (req as any).params as { id: string }
+addRoute('POST', '/projects/:id/export', (req, res, body, params) => {
   const { project } = useAppStore.getState()
-  if (!project || project.id !== id) {
+  if (!project || project.id !== params.id) {
     json(res, 404, { error: 'Project not found' })
     return
   }
@@ -190,10 +238,9 @@ addRoute('POST', '/projects/:id/export', (req, res, body) => {
   }).catch(() => json(res, 500, { error: 'Export failed' }))
 })
 
-addRoute('POST', '/projects/:id/theme', (req, res, body) => {
-  const { id } = (req as any).params as { id: string }
+addRoute('POST', '/projects/:id/theme', (req, res, body, params) => {
   const { project, setTheme } = useAppStore.getState()
-  if (!project || project.id !== id) {
+  if (!project || project.id !== params.id) {
     json(res, 404, { error: 'Project not found' })
     return
   }
@@ -203,10 +250,9 @@ addRoute('POST', '/projects/:id/theme', (req, res, body) => {
   json(res, 200, { success: true, theme: useAppStore.getState().currentTheme })
 })
 
-addRoute('POST', '/projects/:id/viewport', (req, res, body) => {
-  const { id } = (req as any).params as { id: string }
+addRoute('POST', '/projects/:id/viewport', (req, res, body, params) => {
   const { project, setViewport } = useAppStore.getState()
-  if (!project || project.id !== id) {
+  if (!project || project.id !== params.id) {
     json(res, 404, { error: 'Project not found' })
     return
   }
@@ -216,10 +262,9 @@ addRoute('POST', '/projects/:id/viewport', (req, res, body) => {
   json(res, 200, { success: true, viewport: project.viewport })
 })
 
-addRoute('DELETE', '/projects/:id', (req, res) => {
-  const { id } = (req as any).params as { id: string }
+addRoute('DELETE', '/projects/:id', (req, res, _body, params) => {
   const { project, clearProject } = useAppStore.getState()
-  if (!project || project.id !== id) {
+  if (!project || project.id !== params.id) {
     json(res, 404, { error: 'Project not found' })
     return
   }
@@ -233,9 +278,7 @@ export function startServer() {
     const path = parsedUrl.pathname
     const method = req.method || 'GET'
 
-    res.setHeader('Access-Control-Allow-Origin', '*')
-    res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS')
-    res.setHeader('Access-Control-Allow-Headers', 'Content-Type')
+    setCorsHeaders(res)
 
     if (method === 'OPTIONS') {
       res.writeHead(204)
@@ -243,14 +286,14 @@ export function startServer() {
       return
     }
 
-    const handler = matchRoute(method, path)
-    if (!handler) {
+    const match = matchRoute(method, path)
+    if (!match) {
       notFound(res)
       return
     }
 
     const body = await parseBody(req)
-    handler(req, res, body)
+    match.handler(req, res, body, match.params)
   })
 
   server.listen(PORT, () => {

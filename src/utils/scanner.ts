@@ -54,7 +54,7 @@ export interface ScanResult {
 }
 
 export function applyScanResult(result: ScanResult) {
-  const { setBlocks, setConnections, setViewport } = useAppStore.getState()
+  const { setBlocks, setConnections } = useAppStore.getState()
   if (!result.components.length) return
 
   const padding = 80
@@ -95,7 +95,7 @@ export function applyScanResult(result: ScanResult) {
       const title = item.name.length > 24 ? item.name.slice(0, 22) + '...' : item.name
       const desc = [techLabel, item.file].filter(Boolean).join('\n')
       const id = crypto.randomUUID()
-      idMap[item.name + '\x00' + item.file] = id
+      idMap[item.id] = id
       const x = padding + col * gapX
       const y = padding + row * gapY
       blocks.push({ id, title, description: desc, image: null, x, y, width: blockW, height: blockH, color: COLORS[item.type] || COLORS.module })
@@ -104,11 +104,8 @@ export function applyScanResult(result: ScanResult) {
   }
 
   for (const conn of result.connections) {
-    const sourceComp = components.find((c) => c.id === conn.source)
-    const targetComp = components.find((c) => c.id === conn.target)
-    if (!sourceComp || !targetComp) continue
-    const fromId = idMap[sourceComp.name + '\x00' + sourceComp.file]
-    const toId = idMap[targetComp.name + '\x00' + targetComp.file]
+    const fromId = idMap[conn.source]
+    const toId = idMap[conn.target]
     if (fromId && toId) {
       connections.push({
         id: crypto.randomUUID(),
@@ -137,7 +134,7 @@ export function applyScanResult(result: ScanResult) {
 }
 
 export function regroupAll() {
-  const { project, setBlocks, setConnections } = useAppStore.getState()
+  const { project, setBlocks, setConnections, setViewport } = useAppStore.getState()
   if (!project || project.blocks.length === 0) return
 
   const connMap: Record<string, string[]> = {}
@@ -153,16 +150,16 @@ export function regroupAll() {
   const levels: Record<number, Block[]> = {}
   const blockMap = new Map(project.blocks.map((b) => [b.id, { ...b }]))
 
-  const placeNode = (blockId: string, level: number, index: number, siblingCount: number) => {
+  const placeNode = (blockId: string, level: number) => {
     if (visited.has(blockId)) return
     visited.add(blockId)
     levels[level] = levels[level] || []
     levels[level].push(blockMap.get(blockId)!)
     const childs = connMap[blockId] || []
-    childs.forEach((childId, idx) => placeNode(childId, level + 1, idx, childs.length))
+    childs.forEach((childId) => placeNode(childId, level + 1))
   }
 
-  roots.forEach((root, idx) => placeNode(root.id, 0, idx, roots.length))
+  roots.forEach((root) => placeNode(root.id, 0))
 
   project.blocks.forEach((b) => {
     if (!visited.has(b.id)) {

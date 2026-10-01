@@ -48,7 +48,7 @@ export interface Project {
   updatedAt: string
 }
 
-export type ThemeName = 'monochrome' | 'colorful' | 'dark' | 'bubble'
+export type ThemeName = 'monochrome' | 'colorful' | 'dark' | 'notepad' | 'bubble'
 
 export interface Theme {
   name: ThemeName

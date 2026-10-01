@@ -32,8 +32,8 @@ interface AppState {
   addGroup: (group: Group) => void
   updateGroup: (id: string, patch: Partial<Group>) => void
   deleteGroup: (id: string) => void
-  setSelectedBlockIds: (ids: string[]) => void
-  setSelectedConnectionId: (id: string | null) => void
+  setSelectedBlockIds: (ids: string[] | ((prev: string[]) => string[])) => void
+  setSelectedConnectionId: (id: string | null | ((prev: string | null) => string | null)) => void
   setViewport: (viewport: Project['viewport']) => void
   updateProjectMeta: (name: string, path: string) => void
   markDirty: () => void
@@ -98,6 +98,20 @@ const themes: Record<ThemeName, Theme> = {
     success: '#059669',
     warning: '#b45309',
     danger: '#dc2626',
+    fontFamily: 'Inter, Segoe UI, sans-serif',
+  },
+  bubble: {
+    name: 'bubble',
+    background: '#fff1f3',
+    canvas: '#fff9fa',
+    card: '#ffffff',
+    cardBorder: '#fda4af',
+    textPrimary: '#831843',
+    textSecondary: '#be185d',
+    primary: '#ec4899',
+    success: '#14b8a6',
+    warning: '#f59e0b',
+    danger: '#ef4444',
     fontFamily: 'Inter, Segoe UI, sans-serif',
   },
 }
@@ -266,7 +280,7 @@ export const useAppStore = create<AppState>((set, get) => ({
       }
     }),
   setSelectedBlockIds: (ids) => set((state) => ({ selectedBlockIds: typeof ids === 'function' ? ids(state.selectedBlockIds) : ids })),
-  setSelectedConnectionId: (id) => set({ selectedConnectionId: id }),
+  setSelectedConnectionId: (id) => set((state) => ({ selectedConnectionId: typeof id === 'function' ? id(state.selectedConnectionId) : id })),
   setConnectionRouting: (routing) =>
     set((s) => {
       if (!s.project) return s
