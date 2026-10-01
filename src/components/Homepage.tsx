@@ -93,12 +93,12 @@ export const Homepage = () => {
       </div>
 
       {recent.length > 0 && (
-        <div className="recent-list">
+        <div className="recent-list" role="list">
           <div style={{ fontSize: 12, fontWeight: 600, color: theme.theme.textSecondary, marginBottom: 12, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
             Recent Projects
           </div>
           {recent.slice(0, 5).map((r) => (
-            <div key={r.id} aria-label={r.name} className="recent-item" style={{ background: theme.theme.card, borderColor: theme.theme.cardBorder }}>
+            <div key={r.id} role="listitem" className="recent-item" style={{ background: theme.theme.card, borderColor: theme.theme.cardBorder }}>
               <div>
                 <div className="recent-item-name" style={{ color: theme.theme.textPrimary }}>{r.name}</div>
                 <div className="recent-item-meta" style={{ color: theme.theme.textSecondary }}>{r.path}</div>

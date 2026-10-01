@@ -101,7 +101,7 @@ export const Canvas = () => {
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       const target = e.target as HTMLElement | null
-      if (target && (target.isContentEditable || ['INPUT', 'TEXTAREA', 'SELECT'].includes(target.tagName))) return
+      if (target && (target.isContentEditable || target.closest('button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'))) return
       if (e.ctrlKey || e.metaKey || e.altKey) return
       const tool = toolKeys[e.key.toLowerCase()]
       if (tool) {
@@ -362,7 +362,7 @@ export const Canvas = () => {
   if (!project) return null
 
   return (
-    <div className="canvas-area" ref={containerRef} role="application" aria-label="Diagram canvas" tabIndex={0} style={{ background: theme.theme.canvas }}>
+    <div className="canvas-area" ref={containerRef} aria-label="Diagram canvas" tabIndex={0} style={{ background: theme.theme.canvas }}>
       <Stage
         width={stageSize.width}
         height={stageSize.height}

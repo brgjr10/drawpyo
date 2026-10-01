@@ -91,11 +91,12 @@ export const Header = () => {
     if (!blob) return
     const reader = new FileReader()
     reader.onload = () => {
-      const base64 = btoa(String.fromCharCode(...new Uint8Array(reader.result as ArrayBuffer)))
+      const dataUrl = reader.result as string
+      const base64 = dataUrl.split(',')[1]
       window.electronAPI.writeBuffer(`${proj.path}/export.png`, base64)
         .then(() => showSaveStatus('Exported!'))
     }
-    reader.readAsArrayBuffer(blob)
+    reader.readAsDataURL(blob)
   }
 
   const handleAutoScan = async () => {
