@@ -3,7 +3,7 @@ import { Stage, Layer, Rect, Text, Line, Group, Image as KonvaImage } from 'reac
 import Konva from 'konva'
 import { useTheme } from './ThemeProvider'
 import { useAppStore } from '../store'
-import { Block, Point } from '../types'
+import { Block, Point, Tool } from '../types'
 
 interface ImageDim {
   img: HTMLImageElement
@@ -11,6 +11,8 @@ interface ImageDim {
   height: number
   resized: boolean
 }
+
+const toolKeys: Record<string, Tool> = { v: 'select', p: 'pan', c: 'connect', g: 'group' }
 
 export const Canvas = () => {
   const theme = useTheme()
@@ -38,10 +40,9 @@ export const Canvas = () => {
   const [mousePos, setMousePos] = useState<Point & { shiftKey?: boolean }>({ x: 0, y: 0 })
   const [dragStartPositions, setDragStartPositions] = useState<{ id: string; x: number; y: number }[]>([])
   const [dragOrigin, setDragOrigin] = useState<{ x: number; y: number } | null>(null)
-  const [imageTick, setImageTick] = useState(0)
 
   const isPanningRef = useRef(false)
-  const panStartRef = useRef<{ x: number; y: number } | null>(null)
+  const panStartRef = useRef<{ x: number; y: number; stageX: number; stageY: number } | null>(null)
 
   const imageCache = useRef<Map<string, ImageDim>>(new Map())
 
@@ -50,13 +51,14 @@ export const Canvas = () => {
     const toLoad = project.blocks.filter((b) => b.image && !imageCache.current.has(b.image))
     toLoad.forEach((b) => {
       if (!b.image) return
+      const imgSrc = b.image
       const img = new window.Image()
       img.onload = () => {
         const width = img.naturalWidth
         const height = img.naturalHeight
         if (!Number.isFinite(width) || !Number.isFinite(height) || width <= 0 || height <= 0) return
         const dim: ImageDim = { img, width, height, resized: false }
-        imageCache.current.set(b.image, dim)
+        imageCache.current.set(imgSrc, dim)
         const current = useAppStore.getState().project?.blocks.find((blk) => blk.id === b.id)
         const curW = current?.width ?? b.width
         const curH = current?.height ?? b.height
@@ -65,10 +67,9 @@ export const Canvas = () => {
           updateBlock(b.id, { width: Math.max(curW, dim.width + 16), height: Math.max(curH, dim.height + 100) })
         }
         dim.resized = true
-        setImageTick((t) => t + 1)
       }
-      img.onerror = () => console.error('Failed to load image:', b.image?.slice(0, 50))
-      img.src = b.image
+      img.onerror = () => console.error('Failed to load image:', imgSrc.slice(0, 50))
+      img.src = imgSrc
       if (img.complete && img.naturalWidth > 0) {
         img.onload(new Event('load') as any)
       }
@@ -77,8 +78,16 @@ export const Canvas = () => {
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
+      const target = e.target as HTMLElement | null
+      if (target && (target.isContentEditable || ['INPUT', 'TEXTAREA', 'SELECT'].includes(target.tagName))) return
+      if (e.ctrlKey || e.metaKey || e.altKey) return
+      const tool = toolKeys[e.key.toLowerCase()]
+      if (tool) {
+        useAppStore.getState().setActiveTool(tool)
+        return
+      }
       if (e.key === 'Delete' || e.key === 'Backspace') {
-        const { selectedBlockIds, selectedConnectionId, deleteBlock, deleteConnection, project } = useAppStore.getState()
+        const { selectedBlockIds, selectedConnectionId, deleteBlock, deleteConnection } = useAppStore.getState()
         if (selectedBlockIds.length > 0) {
           selectedBlockIds.forEach((id) => deleteBlock(id))
           useAppStore.getState().setSelectedBlockIds([])
@@ -180,7 +189,7 @@ export const Canvas = () => {
     }
   }
 
-  const handleStageMouseUp = (e: Konva.KonvaEventObject<MouseEvent>) => {
+  const handleStageMouseUp = (_e: Konva.KonvaEventObject<MouseEvent>) => {
     if (isPanningRef.current) {
       isPanningRef.current = false
       const stage = stageRef.current
@@ -286,7 +295,7 @@ export const Canvas = () => {
     }
   }
 
-  const handleBlockClick = (blockId: string, e: Konva.KonvaEventObject<MouseEvent>) => {
+  const handleBlockClick = (blockId: string, e: Konva.KonvaEventObject<Event>) => {
     if (activeTool === 'connect') {
       if (!connectingFrom) {
         setConnectingFrom(blockId)
@@ -296,7 +305,7 @@ export const Canvas = () => {
       }
       return
     }
-    if (e.evt.shiftKey) {
+    if ((e.evt as MouseEvent).shiftKey) {
       setSelectedBlockIds((prev) => prev.includes(blockId) ? prev.filter((id) => id !== blockId) : [...prev, blockId])
     } else {
       setSelectedBlockIds([blockId])
@@ -304,8 +313,8 @@ export const Canvas = () => {
     setSelectedConnectionId(null)
   }
 
-  const handleConnectionClick = (connectionId: string, e: Konva.KonvaEventObject<MouseEvent>) => {
-    if (e.evt.shiftKey) {
+  const handleConnectionClick = (connectionId: string, e: Konva.KonvaEventObject<Event>) => {
+    if ((e.evt as MouseEvent).shiftKey) {
       setSelectedConnectionId((prev) => prev === connectionId ? null : connectionId)
     } else {
       setSelectedConnectionId(connectionId)
@@ -328,7 +337,7 @@ export const Canvas = () => {
   if (!project) return null
 
   return (
-    <div className="canvas-area" ref={containerRef} style={{ background: theme.theme.canvas }}>
+    <div className="canvas-area" ref={containerRef} role="application" aria-label="Diagram canvas" tabIndex={0} style={{ background: theme.theme.canvas }}>
       <Stage
         width={stageSize.width}
         height={stageSize.height}
@@ -440,7 +449,7 @@ export const Canvas = () => {
           const centerY = -stage.y() / zoom + stageSize.height / (2 * zoom)
           addBlock({ id: crypto.randomUUID(), title: 'New Block', description: '', image: null, x: centerX - 60, y: centerY - 30, width: 120, height: 60, color: theme.theme.primary })
         }} style={{ padding: '6px 12px', borderRadius: 6, border: `1px solid ${theme.theme.cardBorder}`, background: theme.theme.card, color: theme.theme.textPrimary, fontSize: 12, cursor: 'pointer', pointerEvents: 'auto', fontFamily: theme.theme.fontFamily, fontWeight: 600 }}>+ Add Block</button>
-        <button onClick={() => useAppStore.getState().setActiveTool('connect')} style={{ padding: '6px 12px', borderRadius: 6, border: `1px solid ${activeTool === 'connect' ? theme.theme.primary : theme.theme.cardBorder}`, background: activeTool === 'connect' ? theme.theme.primary : theme.theme.card, color: activeTool === 'connect' ? '#fff' : theme.theme.textPrimary, fontSize: 12, cursor: 'pointer', pointerEvents: 'auto', fontFamily: theme.theme.fontFamily, fontWeight: 600 }}>Connect</button>
+        <button onClick={() => useAppStore.getState().setActiveTool('connect')} aria-pressed={activeTool === 'connect'} style={{ padding: '6px 12px', borderRadius: 6, border: `1px solid ${activeTool === 'connect' ? theme.theme.primary : theme.theme.cardBorder}`, background: activeTool === 'connect' ? theme.theme.primary : theme.theme.card, color: activeTool === 'connect' ? '#fff' : theme.theme.textPrimary, fontSize: 12, cursor: 'pointer', pointerEvents: 'auto', fontFamily: theme.theme.fontFamily, fontWeight: 600 }}>Connect</button>
         <button onClick={centerView} style={{ padding: '6px 12px', borderRadius: 6, border: `1px solid ${theme.theme.cardBorder}`, background: theme.theme.card, color: theme.theme.textPrimary, fontSize: 12, cursor: 'pointer', pointerEvents: 'auto', fontFamily: theme.theme.fontFamily, fontWeight: 600 }}>Center View</button>
       </div>
     </div>

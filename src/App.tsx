@@ -15,10 +15,10 @@ const AppContent = () => {
   return (
     <>
       <Header />
-      <div className="main-content">
+      <main className="main-content">
         <Canvas />
         <Sidebar />
-      </div>
+      </main>
     </>
   )
 }

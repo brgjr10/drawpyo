@@ -98,12 +98,12 @@ export const Homepage = () => {
             Recent Projects
           </div>
           {recent.slice(0, 5).map((r) => (
-            <div key={r.id} className="recent-item" style={{ background: theme.theme.card, borderColor: theme.theme.cardBorder }}>
+            <div key={r.id} aria-label={r.name} className="recent-item" style={{ background: theme.theme.card, borderColor: theme.theme.cardBorder }}>
               <div>
                 <div className="recent-item-name" style={{ color: theme.theme.textPrimary }}>{r.name}</div>
                 <div className="recent-item-meta" style={{ color: theme.theme.textSecondary }}>{r.path}</div>
               </div>
-              <button
+              <button aria-label={`Open ${r.name}`}
                 className="btn"
                 style={{ padding: '4px 10px', fontSize: 12, background: theme.theme.primary, borderColor: theme.theme.primary, color: '#fff' }}
                 onClick={() => handleOpenRecent(r.path)}
@@ -131,7 +131,7 @@ export const Homepage = () => {
           justifyContent: 'center',
           zIndex: 1000,
         }} onClick={() => setShowRecentModal(false)}>
-          <div style={{
+          <div role="dialog" aria-modal="true" aria-label="Recent Projects" style={{
             background: theme.theme.card,
             border: `1px solid ${theme.theme.cardBorder}`,
             borderRadius: 12,
@@ -145,7 +145,12 @@ export const Homepage = () => {
               <div style={{ color: theme.theme.textSecondary, fontSize: 13 }}>No recent projects.</div>
             ) : (
               recent.map((r) => (
-                <div key={r.id} style={{
+                <div key={r.id} role="button" tabIndex={0} aria-label={`Open ${r.name}`} onKeyDown={(e) => {
+                  if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault()
+                    handleOpenRecent(r.path)
+                  }
+                }} style={{
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'space-between',
@@ -159,7 +164,7 @@ export const Homepage = () => {
                     <div style={{ fontWeight: 500, color: theme.theme.textPrimary, fontSize: 14 }}>{r.name}</div>
                     <div style={{ color: theme.theme.textSecondary, fontSize: 12 }}>{r.path}</div>
                   </div>
-                  <button className="btn" style={{ padding: '4px 12px', fontSize: 12, background: theme.theme.primary, borderColor: theme.theme.primary, color: '#fff' }}>Open</button>
+                  <button tabIndex={-1} aria-hidden="true" className="btn" style={{ padding: '4px 12px', fontSize: 12, background: theme.theme.primary, borderColor: theme.theme.primary, color: '#fff' }}>Open</button>
                 </div>
               ))
             )}

@@ -91,8 +91,8 @@ export const Header = () => {
     if (!blob) return
     const reader = new FileReader()
     reader.onload = () => {
-      const buffer = Buffer.from(reader.result as ArrayBuffer)
-      window.electronAPI.writeFile(`${proj.path}/export.png`, buffer.toString('base64'))
+      const base64 = btoa(String.fromCharCode(...new Uint8Array(reader.result as ArrayBuffer)))
+      window.electronAPI.writeBuffer(`${proj.path}/export.png`, base64)
         .then(() => showSaveStatus('Exported!'))
     }
     reader.readAsArrayBuffer(blob)
@@ -154,7 +154,7 @@ export const Header = () => {
           <button className="btn" onClick={handleAutoScan} style={{ background: theme.theme.success, borderColor: theme.theme.success, color: '#fff' }}>Auto-Scan</button>
           <button className="btn" onClick={handleRegroupAll} style={{ background: theme.theme.card, borderColor: theme.theme.cardBorder, color: theme.theme.textPrimary }}>Regroup All</button>
           <button className="btn" onClick={handleRemoveLooseBlocks} style={{ background: theme.theme.danger, borderColor: theme.theme.danger, color: '#fff' }}>Remove Loose</button>
-          <select className="select" onChange={handleRoutingChange} defaultValue="squared" style={{ background: theme.theme.background, color: theme.theme.textPrimary, borderColor: theme.theme.cardBorder, padding: '4px 8px', fontSize: 12 }}>
+          <select aria-label="Connection routing" className="select" onChange={handleRoutingChange} defaultValue="squared" style={{ background: theme.theme.background, color: theme.theme.textPrimary, borderColor: theme.theme.cardBorder, padding: '4px 8px', fontSize: 12 }}>
             <option value="squared">Squared Lines</option>
             <option value="curved">Curved Lines</option>
             <option value="user-guided">Straight</option>
@@ -164,16 +164,17 @@ export const Header = () => {
       )}
 
       {saveStatus && (
-        <span style={{ color: theme.theme.success, fontSize: 12, marginLeft: 8 }}>{saveStatus}</span>
+        <span role="status" aria-live="polite" style={{ color: theme.theme.success, fontSize: 12, marginLeft: 8 }}>{saveStatus}</span>
       )}
 
       {scanStatus && (
-        <span style={{ color: theme.theme.warning, fontSize: 12, marginLeft: 8 }}>{scanStatus}</span>
+        <span role="status" aria-live="polite" style={{ color: theme.theme.warning, fontSize: 12, marginLeft: 8 }}>{scanStatus}</span>
       )}
 
       <div style={{ width: 1, height: 24, background: theme.theme.cardBorder, margin: '0 8px' }} />
 
       <select
+        aria-label="Color theme"
         className="select"
         value={currentTheme}
         onChange={(e) => setTheme(e.target.value as any)}
@@ -189,11 +190,11 @@ export const Header = () => {
         <>
           <div style={{ width: 1, height: 24, background: theme.theme.cardBorder, margin: '0 8px' }} />
           <div className="zoom-controls">
-            <button className="btn" onClick={() => useAppStore.getState().setZoom(useAppStore.getState().zoom - 0.1)} style={{ background: theme.theme.card, borderColor: theme.theme.cardBorder, color: theme.theme.textPrimary }}>-</button>
-            <span className="zoom-label" style={{ color: theme.theme.textSecondary }}>
+            <button className="btn" aria-label="Zoom out" onClick={() => useAppStore.getState().setZoom(useAppStore.getState().zoom - 0.1)} style={{ background: theme.theme.card, borderColor: theme.theme.cardBorder, color: theme.theme.textPrimary }}>-</button>
+            <span className="zoom-label" role="status" aria-live="polite" style={{ color: theme.theme.textSecondary }}>
               {Math.round(useAppStore.getState().zoom * 100)}%
             </span>
-            <button className="btn" onClick={() => useAppStore.getState().setZoom(useAppStore.getState().zoom + 0.1)} style={{ background: theme.theme.card, borderColor: theme.theme.cardBorder, color: theme.theme.textPrimary }}>+</button>
+            <button className="btn" aria-label="Zoom in" onClick={() => useAppStore.getState().setZoom(useAppStore.getState().zoom + 0.1)} style={{ background: theme.theme.card, borderColor: theme.theme.cardBorder, color: theme.theme.textPrimary }}>+</button>
             <button className="btn" onClick={() => useAppStore.getState().setZoom(1)} style={{ background: theme.theme.card, borderColor: theme.theme.cardBorder, color: theme.theme.textPrimary }}>Reset</button>
           </div>
         </>

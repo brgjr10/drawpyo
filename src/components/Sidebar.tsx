@@ -10,7 +10,7 @@ export const Sidebar = () => {
   if (sidebarCollapsed) {
     return (
       <div className="sidebar collapsed" style={{ borderLeftColor: theme.theme.cardBorder, display: 'flex', alignItems: 'center', justifyContent: 'center', background: theme.theme.card }}>
-        <button className="btn" onClick={toggleSidebar} style={{ padding: 4, width: 24, height: 24, fontSize: 16, lineHeight: 1, background: theme.theme.card, borderColor: theme.theme.cardBorder, color: theme.theme.textPrimary }}>&gt;</button>
+        <button className="btn" aria-label="Show sidebar" onClick={toggleSidebar} style={{ padding: 4, width: 24, height: 24, fontSize: 16, lineHeight: 1, background: theme.theme.card, borderColor: theme.theme.cardBorder, color: theme.theme.textPrimary }}>&gt;</button>
       </div>
     )
   }
@@ -24,10 +24,10 @@ export const Sidebar = () => {
     : null
 
   return (
-    <div className="sidebar" style={{ background: theme.theme.card, borderLeftColor: theme.theme.cardBorder }}>
+    <aside className="sidebar" aria-label="Editor panel" style={{ background: theme.theme.card, borderLeftColor: theme.theme.cardBorder }}>
       <div className="sidebar-header" style={{ color: theme.theme.textPrimary, opacity: 0.8, borderBottomColor: theme.theme.cardBorder }}>
         Editor
-        <button className="btn" onClick={toggleSidebar} style={{ marginLeft: 'auto', padding: 2, width: 24, height: 24, fontSize: 12, background: theme.theme.card, borderColor: theme.theme.cardBorder, color: theme.theme.textPrimary }}>&gt;</button>
+        <button className="btn" aria-label="Hide sidebar" onClick={toggleSidebar} style={{ marginLeft: 'auto', padding: 2, width: 24, height: 24, fontSize: 12, background: theme.theme.card, borderColor: theme.theme.cardBorder, color: theme.theme.textPrimary }}>&gt;</button>
       </div>
       <div className="sidebar-body">
         {selectedBlock ? (
@@ -50,7 +50,7 @@ export const Sidebar = () => {
           </div>
         )}
       </div>
-    </div>
+    </aside>
   )
 }
 
@@ -91,7 +91,12 @@ const BlockEditor = ({
     setDragOver(false)
     const file = e.dataTransfer.files[0]
     if (!file || !file.type.startsWith('image/')) return
-    const dataUrl = await window.electronAPI.readImageFile(file.path)
+    const dataUrl = await new Promise<string | null>((resolve) => {
+      const reader = new FileReader()
+      reader.onload = () => resolve(reader.result as string)
+      reader.onerror = () => resolve(null)
+      reader.readAsDataURL(file)
+    })
     if (dataUrl) {
       onUpdate({ image: dataUrl })
     }
@@ -101,8 +106,9 @@ const BlockEditor = ({
     <div className="sidebar-section">
       <div className="sidebar-label">Block</div>
       <div className="sidebar-row">
-        <label style={{ fontSize: 12, color: theme.textPrimary, opacity: 0.7 }}>Title</label>
+        <label htmlFor="block-title" style={{ fontSize: 12, color: theme.textPrimary, opacity: 0.7 }}>Title</label>
         <input
+          id="block-title"
           className="input"
           value={block.title}
           onChange={(e) => onUpdate({ title: e.target.value })}
@@ -110,8 +116,9 @@ const BlockEditor = ({
         />
       </div>
       <div className="sidebar-row" style={{ marginTop: 12 }}>
-        <label style={{ fontSize: 12, color: theme.textPrimary, opacity: 0.7 }}>Description</label>
+        <label htmlFor="block-description" style={{ fontSize: 12, color: theme.textPrimary, opacity: 0.7 }}>Description</label>
         <textarea
+          id="block-description"
           className="textarea"
           value={block.description}
           onChange={(e) => onUpdate({ description: e.target.value })}
@@ -119,21 +126,31 @@ const BlockEditor = ({
         />
       </div>
       <div className="sidebar-row" style={{ marginTop: 12 }}>
-        <label style={{ fontSize: 12, color: theme.textPrimary, opacity: 0.7 }}>Size</label>
-        <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-          <button className="btn" onClick={() => onUpdate({ width: Math.max(80, block.width - 20) })} style={{ padding: '2px 8px', fontSize: 12, background: theme.card, borderColor: theme.cardBorder, color: theme.textPrimary }}>W-</button>
-          <button className="btn" onClick={() => onUpdate({ width: block.width + 20 })} style={{ padding: '2px 8px', fontSize: 12, background: theme.card, borderColor: theme.cardBorder, color: theme.textPrimary }}>W+</button>
-          <button className="btn" onClick={() => onUpdate({ height: Math.max(40, block.height - 20) })} style={{ padding: '2px 8px', fontSize: 12, background: theme.card, borderColor: theme.cardBorder, color: theme.textPrimary }}>H-</button>
-          <button className="btn" onClick={() => onUpdate({ height: block.height + 20 })} style={{ padding: '2px 8px', fontSize: 12, background: theme.card, borderColor: theme.cardBorder, color: theme.textPrimary }}>H+</button>
+        <span style={{ fontSize: 12, color: theme.textPrimary, opacity: 0.7 }}>Size</span>
+        <div style={{ display: 'flex', gap: 8, alignItems: 'center' }} role="group" aria-label="Block size">
+          <button className="btn" aria-label="Decrease block width" onClick={() => onUpdate({ width: Math.max(80, block.width - 20) })} style={{ padding: '2px 8px', fontSize: 12, background: theme.card, borderColor: theme.cardBorder, color: theme.textPrimary }}>W-</button>
+          <button className="btn" aria-label="Increase block width" onClick={() => onUpdate({ width: block.width + 20 })} style={{ padding: '2px 8px', fontSize: 12, background: theme.card, borderColor: theme.cardBorder, color: theme.textPrimary }}>W+</button>
+          <button className="btn" aria-label="Decrease block height" onClick={() => onUpdate({ height: Math.max(40, block.height - 20) })} style={{ padding: '2px 8px', fontSize: 12, background: theme.card, borderColor: theme.cardBorder, color: theme.textPrimary }}>H-</button>
+          <button className="btn" aria-label="Increase block height" onClick={() => onUpdate({ height: block.height + 20 })} style={{ padding: '2px 8px', fontSize: 12, background: theme.card, borderColor: theme.cardBorder, color: theme.textPrimary }}>H+</button>
         </div>
       </div>
       <div className="sidebar-row" style={{ marginTop: 12 }}>
-        <label style={{ fontSize: 12, color: theme.textPrimary, opacity: 0.7 }}>Image</label>
+        <span style={{ fontSize: 12, color: theme.textPrimary, opacity: 0.7 }}>Image</span>
         <div
           onDragOver={handleDragOver}
           onDragLeave={handleDragLeave}
           onDrop={handleDrop}
           onClick={() => !block.image && handleFileSelect()}
+          onKeyDown={(e) => {
+            if (block.image) return
+            if (e.key === 'Enter' || e.key === ' ') {
+              e.preventDefault()
+              handleFileSelect()
+            }
+          }}
+          role={block.image ? 'group' : 'button'}
+          tabIndex={block.image ? undefined : 0}
+          aria-label={block.image ? undefined : 'Drop an image here or choose a file'}
           style={{
             border: `2px dashed ${dragOver ? theme.primary : theme.cardBorder}`,
             borderRadius: 8,
@@ -153,7 +170,7 @@ const BlockEditor = ({
             <>
               <img
                 src={block.image}
-                alt=""
+                alt={block.title ? `${block.title} image` : 'Block image'}
                 style={{ width: '100%', height: 'auto', maxHeight: 160, objectFit: 'contain', borderRadius: 6, display: 'block' }}
               />
               <div style={{ position: 'absolute', top: 8, right: 8, display: 'flex', gap: 4 }}>
@@ -185,8 +202,9 @@ const BlockEditor = ({
           )}
         </div>
         <div className="sidebar-row" style={{ marginTop: 8 }}>
-          <label style={{ fontSize: 12, color: theme.textPrimary, opacity: 0.7 }}>Or enter Image URL</label>
+          <label htmlFor="block-image-url" style={{ fontSize: 12, color: theme.textPrimary, opacity: 0.7 }}>Or enter Image URL</label>
           <input
+            id="block-image-url"
             className="input"
             value={block.image && !block.image.startsWith('data:') ? block.image : ''}
             onChange={(e) => onUpdate({ image: e.target.value || null })}
@@ -196,19 +214,25 @@ const BlockEditor = ({
         </div>
       </div>
       <div className="sidebar-row" style={{ marginTop: 12 }}>
-        <label style={{ fontSize: 12, color: theme.textPrimary, opacity: 0.7 }}>Color</label>
-        <div style={{ display: 'flex', gap: 8 }}>
+        <span style={{ fontSize: 12, color: theme.textPrimary, opacity: 0.7 }}>Color</span>
+        <div style={{ display: 'flex', gap: 8 }} role="group" aria-label="Block color">
           {['#58a6ff', '#3fb950', '#d29922', '#f85149', '#a371f7', '#f778ba'].map((c) => (
-            <div
+            <button
               key={c}
+              type="button"
               className={`color-swatch ${block.color === c ? 'active' : ''}`}
               style={{ background: c }}
+              aria-label={`Set block color ${c}`}
+              aria-pressed={block.color === c}
               onClick={() => onUpdate({ color: c })}
             />
           ))}
-          <div
+          <button
+            type="button"
             className={`color-swatch ${!block.color ? 'active' : ''}`}
             style={{ background: 'transparent', border: '2px dashed ' + theme.cardBorder }}
+            aria-label="Set no block color"
+            aria-pressed={!block.color}
             onClick={() => onUpdate({ color: '' })}
           />
         </div>

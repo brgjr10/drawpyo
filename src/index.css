@@ -22,7 +22,7 @@ html, body, #root {
   color: #c9d1d9;
 }
 
-.main-content {
+main.main-content {
   display: flex;
   flex: 1;
   overflow: hidden;
@@ -190,6 +190,7 @@ html, body, #root {
 .color-swatch {
   width: 24px;
   height: 24px;
+  padding: 0;
   border-radius: 4px;
   border: 2px solid #30363d;
   cursor: pointer;

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react'
+import { useState, useEffect } from 'react'
 import { useTheme } from './ThemeProvider'
 
 export const PromptDialog = ({
@@ -43,6 +43,9 @@ export const PromptDialog = ({
       }}
     >
       <div
+        role="dialog"
+        aria-modal="true"
+        aria-label={title}
         style={{
           background: theme.theme.card,
           border: `1px solid ${theme.theme.cardBorder}`,
