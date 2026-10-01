@@ -69,6 +69,27 @@ app.on('activate', () => {
   }
 })
 
+function getProjectRoot(): string | null {
+  const { project } = require('../src/store').useAppStore.getState()
+  return project?.path ? path.resolve(project.path) : null
+}
+
+function resolveSafe(requestedPath: string): string | null {
+  const projectRoot = getProjectRoot()
+  if (!projectRoot) return null
+  const resolved = path.resolve(projectRoot, requestedPath)
+  if (!resolved.startsWith(projectRoot + path.sep) && resolved !== projectRoot) {
+    return null
+  }
+  return resolved
+}
+
+function atomicWriteFile(filePath: string, content: string | Buffer, encoding: BufferEncoding = 'utf-8'): void {
+  const tmpPath = filePath + '.tmp'
+  fs.writeFileSync(tmpPath, content, encoding)
+  fs.renameSync(tmpPath, filePath)
+}
+
 ipcMain.handle('dialog:openDirectory', async () => {
   const result = await dialog.showOpenDialog(mainWindow!, {
     properties: ['openDirectory'],
@@ -99,8 +120,10 @@ ipcMain.handle('dialog:selectImageFile', async () => {
 })
 
 ipcMain.handle('fs:readImageFile', async (_event, filePath: string) => {
+  const safePath = resolveSafe(filePath)
+  if (!safePath) return null
   try {
-    const buffer = fs.readFileSync(filePath)
+    const buffer = fs.readFileSync(safePath)
     const ext = filePath.split('.').pop()?.toLowerCase() || 'png'
     const mimeMap: Record<string, string> = {
       png: 'image/png',
@@ -136,8 +159,10 @@ ipcMain.handle('dialog:prompt', async (_event, title: string, label: string, def
 })
 
 ipcMain.handle('fs:readFile', async (_event, filePath: string) => {
+  const safePath = resolveSafe(filePath)
+  if (!safePath) return null
   try {
-    const data = fs.readFileSync(filePath, 'utf-8')
+    const data = fs.readFileSync(safePath, 'utf-8')
     return data
   } catch (e) {
     return null
@@ -145,21 +170,55 @@ ipcMain.handle('fs:readFile', async (_event, filePath: string) => {
 })
 
 ipcMain.handle('fs:writeFile', async (_event, filePath: string, content: string) => {
-  fs.writeFileSync(filePath, content, 'utf-8')
-  return true
+  const safePath = resolveSafe(filePath)
+  if (!safePath) return false
+  try {
+    atomicWriteFile(safePath, content, 'utf-8')
+    return true
+  } catch (e) {
+    console.error('fs:writeFile failed:', e)
+    return false
+  }
+})
+
+ipcMain.handle('fs:writeBuffer', async (_event, filePath: string, base64: string) => {
+  const safePath = resolveSafe(filePath)
+  if (!safePath) return false
+  try {
+    const buffer = Buffer.from(base64, 'base64')
+    atomicWriteFile(safePath, buffer)
+    return true
+  } catch (e) {
+    console.error('fs:writeBuffer failed:', e)
+    return false
+  }
 })
 
 ipcMain.handle('fs:exists', async (_event, filePath: string) => {
-  return fs.existsSync(filePath)
+  const safePath = resolveSafe(filePath)
+  if (!safePath) return false
+  return fs.existsSync(safePath)
 })
 
 ipcMain.handle('fs:mkdir', async (_event, dirPath: string) => {
-  fs.mkdirSync(dirPath, { recursive: true })
-  return true
+  const safePath = resolveSafe(dirPath)
+  if (!safePath) return false
+  try {
+    fs.mkdirSync(safePath, { recursive: true })
+    return true
+  } catch (e) {
+    return false
+  }
 })
 
 ipcMain.handle('fs:readdir', async (_event, dirPath: string) => {
-  return fs.readdirSync(dirPath)
+  const safePath = resolveSafe(dirPath)
+  if (!safePath) return []
+  try {
+    return fs.readdirSync(safePath)
+  } catch (e) {
+    return []
+  }
 })
 
 ipcMain.handle('project:scan', async (_event, projectPath: string) => {

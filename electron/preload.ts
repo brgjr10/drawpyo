@@ -8,6 +8,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   showPrompt: (title: string, label: string, defaultValue?: string) => ipcRenderer.invoke('dialog:prompt', title, label, defaultValue),
   readFile: (filePath: string) => ipcRenderer.invoke('fs:readFile', filePath),
   writeFile: (filePath: string, content: string) => ipcRenderer.invoke('fs:writeFile', filePath, content),
+  writeBuffer: (filePath: string, base64: string) => ipcRenderer.invoke('fs:writeBuffer', filePath, base64),
   exists: (filePath: string) => ipcRenderer.invoke('fs:exists', filePath),
   mkdir: (dirPath: string) => ipcRenderer.invoke('fs:mkdir', dirPath),
   readdir: (dirPath: string) => ipcRenderer.invoke('fs:readdir', dirPath),
