@@ -149,3 +149,6 @@ dist-electron/
 instructions.md
 .DS_Store
 Thumbs.db
+project.json
+__pycache__/
+*.pyc
