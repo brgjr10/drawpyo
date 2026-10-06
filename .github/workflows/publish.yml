@@ -11,6 +11,9 @@ on:
       - 'assets/**'
       - 'tsconfig*.json'
       - 'vite.config.ts'
+      - '.github/workflows/publish.yml' # ADDED: Triggers the workflow if you update this file itself
+
+  workflow_dispatch: # ADDED: Enables a manual "Run workflow" button in the Actions UI
 
 permissions:
   contents: read
@@ -19,16 +22,15 @@ permissions:
 jobs:
   publish:
     runs-on: windows-latest
-    steps: # FIXED: Aligned properly with runs-on
+    steps:
       - uses: actions/checkout@v4
 
       - uses: actions/setup-node@v4
         with:
           node-version: 20
-          registry-url: 'https://npm.pkg.github.com' # FIXED: Changed back to the package registry URL
+          registry-url: 'https://npm.pkg.github.com'
           scope: '@brgjr10'
 
-      # Falls back to regular install to bypass the lockfile sync error
       - run: npm install --no-audit --no-fund
         env:
           NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
