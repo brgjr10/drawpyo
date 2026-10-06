@@ -19,16 +19,16 @@ permissions:
 jobs:
   publish:
     runs-on: windows-latest
-       steps:
+    steps: # FIXED: Aligned properly with runs-on
       - uses: actions/checkout@v4
 
       - uses: actions/setup-node@v4
         with:
           node-version: 20
-          registry-url: 'https://github.com'
+          registry-url: 'https://npm.pkg.github.com' # FIXED: Changed back to the package registry URL
           scope: '@brgjr10'
 
-      # CHANGED: This falls back to regular install and updates dependencies dynamically
+      # Falls back to regular install to bypass the lockfile sync error
       - run: npm install --no-audit --no-fund
         env:
           NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
